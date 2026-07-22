@@ -106,3 +106,46 @@ export interface AiModeItem {
   markdown: string | null;
   references: AiModeReference[] | null;
 }
+
+export interface RankChanges {
+  previous_rank_absolute?: number | null;
+  is_new?: boolean;
+  is_up?: boolean;
+  is_down?: boolean;
+}
+
+export interface RankedKeywordItem {
+  keyword_data: {
+    keyword: string;
+    keyword_info?: {
+      search_volume?: number;
+      cpc?: number;
+      competition_level?: string;
+    };
+  };
+  ranked_serp_element: {
+    serp_item: {
+      rank_absolute: number;
+      url: string;
+      etv?: number;
+      rank_changes?: RankChanges;
+    };
+  };
+}
+
+export interface HistoricalRankMetrics {
+  etv: number;
+  count: number;
+  is_new?: number;
+  is_up?: number;
+  is_down?: number;
+  is_lost?: number;
+}
+
+export interface HistoricalRankPoint {
+  year: number;
+  month: number;
+  metrics: {
+    organic: HistoricalRankMetrics;
+  };
+}

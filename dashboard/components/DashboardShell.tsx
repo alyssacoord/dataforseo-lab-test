@@ -6,10 +6,10 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { useMode } from './ModeProvider';
 
 const NAV_ITEMS = [
-  { href: '/competitive-set', label: 'Competitive Set', status: 'live' as const },
-  { href: '/trend-detection', label: 'Trend Detection', status: 'live' as const },
-  { href: '/ai-visibility', label: 'AI Visibility', status: 'live' as const },
-  { href: '/search-visibility', label: 'Search Visibility', status: 'soon' as const },
+  { href: '/competitive-set', label: 'Competitive Set' },
+  { href: '/trend-detection', label: 'Trend Detection' },
+  { href: '/ai-visibility', label: 'AI Visibility' },
+  { href: '/search-visibility', label: 'Search Visibility' },
 ];
 
 interface CredStatus {
@@ -79,11 +79,6 @@ export function DashboardShell({ children }: { children: ReactNode }) {
                 }`}
               >
                 <span>{item.label}</span>
-                {item.status === 'soon' && (
-                  <span className="rounded bg-neutral-800 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-neutral-500">
-                    soon
-                  </span>
-                )}
               </Link>
             );
           })}

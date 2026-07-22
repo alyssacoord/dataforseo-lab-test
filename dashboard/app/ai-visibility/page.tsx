@@ -7,16 +7,13 @@ import { LOCATIONS } from '@/lib/locations';
 import { CATEGORICAL } from '@/lib/palette';
 import { BarChart } from '@/components/BarChart';
 import { LineChart } from '@/components/LineChart';
+import { mergeTimeSeries } from '@/lib/mergeTimeSeries';
 import type { MultiTargetMetricsItem, TopMentionedBrandItem, HistoricalMentionPoint, AiModeItem } from '@/lib/types';
 
 // LLM Mentions data only goes back to August 2025 — DataForSEO doesn't have anything earlier.
 const AI_DATA_START = '2025-08-01';
 
 type HistoricalMetric = 'mentions' | 'ai_search_volume';
-
-function monthKey(p: HistoricalMentionPoint): string {
-  return `${p.year}-${String(p.month).padStart(2, '0')}`;
-}
 
 // Light cleanup for display — strips image/link markdown syntax, keeps the readable text.
 function stripMarkdown(md: string): string {
@@ -28,19 +25,6 @@ function stripMarkdown(md: string): string {
     .replace(/`([^`]+)`/g, '$1')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
-}
-
-function mergeHistorical(byBrand: Record<string, HistoricalMentionPoint[]>, metric: HistoricalMetric) {
-  const brands = Object.keys(byBrand);
-  const keySet = new Set<string>();
-  brands.forEach((b) => byBrand[b].forEach((p) => keySet.add(monthKey(p))));
-  const labels = [...keySet].sort();
-
-  const values = brands.map((b) =>
-    labels.map((label) => byBrand[b].find((p) => monthKey(p) === label)?.metrics[metric] ?? null)
-  );
-
-  return { labels, brands, values };
 }
 
 export default function AIVisibilityPage() {
@@ -284,7 +268,7 @@ export default function AIVisibilityPage() {
             {historicalError && <p className="mt-2 text-xs text-rose-400">{historicalError}</p>}
 
             {(() => {
-              const { labels, brands, values } = mergeHistorical(historicalByBrand, historicalMetric);
+              const { labels, keys, values } = mergeTimeSeries(historicalByBrand, (p) => p.metrics[historicalMetric]);
               if (labels.length === 0) {
                 return <p className="mt-3 text-sm text-neutral-500">No historical data returned for these brands.</p>;
               }
@@ -292,7 +276,7 @@ export default function AIVisibilityPage() {
                 <div className="mt-4">
                   <LineChart
                     labels={labels}
-                    series={brands.map((b, i) => ({ label: b, color: CATEGORICAL[i % CATEGORICAL.length] }))}
+                    series={keys.map((k, i) => ({ label: k, color: CATEGORICAL[i % CATEGORICAL.length] }))}
                     values={values}
                   />
                 </div>
