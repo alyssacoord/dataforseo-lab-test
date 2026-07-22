@@ -1,0 +1,29 @@
+# secrets — never commit real DataForSEO credentials
+.env
+.env.local
+.env*.local
+
+# dependencies
+node_modules/
+**/node_modules/
+
+# build output
+.next/
+**/.next/
+out/
+build/
+
+# misc
+.DS_Store
+*.pem
+*.tsbuildinfo
+next-env.d.ts
+
+# logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# claude project metadata
+.claude/

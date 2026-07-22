@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>DataForSEO Test Harness — Coord</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-title">
+      <h1>DataForSEO Test Harness</h1>
+      <span class="subtitle">Endpoints from dataforseo-api-research.md</span>
+    </div>
+    <div class="topbar-controls">
+      <span id="credStatus" class="cred-status">checking credentials…</span>
+      <label class="mode-toggle">
+        <span>Sandbox</span>
+        <input type="checkbox" id="modeSwitch" />
+        <span>Live</span>
+      </label>
+      <span id="progress" class="progress">0 / 0 tested</span>
+    </div>
+  </header>
+
+  <div class="layout">
+    <nav id="sidebar" class="sidebar"></nav>
+
+    <main class="main">
+      <div id="emptyState" class="empty-state">
+        <p>Pick an endpoint on the left to load a sample request.</p>
+      </div>
+
+      <section id="runner" class="runner" hidden>
+        <div class="runner-head">
+          <h2 id="runnerTitle"></h2>
+          <p id="runnerNote" class="note"></p>
+        </div>
+
+        <label class="field">
+          <span>Method + path</span>
+          <div class="path-row">
+            <select id="methodSelect">
+              <option value="POST">POST</option>
+              <option value="GET">GET</option>
+            </select>
+            <input type="text" id="pathInput" spellcheck="false" />
+          </div>
+        </label>
+
+        <label class="field" id="taskIdField" hidden>
+          <span>Task ID (from a prior task_post response)</span>
+          <input type="text" id="taskIdInput" placeholder="paste task id here" />
+        </label>
+
+        <label class="field">
+          <span>Request body (editable JSON — verify field names against the docs before running)</span>
+          <textarea id="bodyInput" rows="10" spellcheck="false"></textarea>
+        </label>
+
+        <div class="run-row">
+          <button id="runBtn">Run test</button>
+          <span id="runStatus" class="run-status"></span>
+        </div>
+
+        <div class="result">
+          <h3>Response</h3>
+          <pre id="resultPane">—</pre>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
