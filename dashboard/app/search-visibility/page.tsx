@@ -162,7 +162,10 @@ export default function SearchVisibilityPage() {
             </div>
 
             {(() => {
-              const { labels, keys, values } = mergeTimeSeries(visibilityByDomain, (p) => p.metrics.organic[visibilityMetric]);
+              const { labels, keys, values } = mergeTimeSeries(
+                visibilityByDomain,
+                (p) => p.metrics.organic?.[visibilityMetric] ?? null
+              );
               if (labels.length === 0) {
                 return <p className="text-sm text-neutral-500">No history to chart.</p>;
               }

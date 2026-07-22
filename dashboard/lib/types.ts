@@ -146,6 +146,8 @@ export interface HistoricalRankPoint {
   year: number;
   month: number;
   metrics: {
-    organic: HistoricalRankMetrics;
+    // Confirmed null for months where the domain had no organic presence
+    // (e.g. before it started ranking) — always guard before reading a field off this.
+    organic: HistoricalRankMetrics | null;
   };
 }
