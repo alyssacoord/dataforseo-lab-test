@@ -182,3 +182,13 @@ export interface SubregionInterestsItem {
   keywords: string[];
   interests: Array<{ keyword: string; values: SubregionInterestValue[] }>;
 }
+
+export interface KeywordDomainRank {
+  domain: string;
+  isTarget: boolean;
+  found: boolean;
+  position: number | null;
+  searchVolume: number | null;
+  cpc: number | null;
+  etv: number | null;
+}

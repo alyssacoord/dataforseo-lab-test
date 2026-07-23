@@ -10,8 +10,8 @@ import { CATEGORICAL } from '@/lib/palette';
 import { BarChart } from '@/components/BarChart';
 import { useFxRate } from '@/lib/useFxRate';
 import { formatUsdToGbp } from '@/lib/currency';
-import { useKeywordDetail } from '@/lib/useKeywordDetail';
-import { KeywordDetailPanel } from '@/components/KeywordDetailPanel';
+import { useKeywordSetLookup } from '@/lib/useKeywordSetLookup';
+import { CompetitiveSetKeywordPanel } from '@/components/CompetitiveSetKeywordPanel';
 import type { CompetitorDomainItem, DomainIntersectionItem } from '@/lib/types';
 
 type SortBy = 'intersections' | 'etv';
@@ -53,7 +53,7 @@ function OverlapPanel({
       {overlap.totalCount !== null && (
         <p className="mb-2 text-[11px] text-neutral-600">
           {overlap.totalCount.toLocaleString()} shared keywords total{filterMode === 'regex' ? ' (fashion vocabulary only)' : ''}{' '}
-          — showing top {overlap.items.length} by volume. Click a keyword for its full detail.
+          — showing top {overlap.items.length} by volume. Click a keyword to look it up across your whole competitive set.
         </p>
       )}
       <table className="w-full text-left text-xs">
@@ -115,13 +115,38 @@ export default function CompetitiveSetPage() {
   const [comparisonError, setComparisonError] = useState<string | null>(null);
   const [comparisonResults, setComparisonResults] = useState<Record<string, ComparisonRow | null>>({});
 
-  const { expandedKeyword, keywordDetails, handleKeywordClick } = useKeywordDetail(
+  const [keywordQuery, setKeywordQuery] = useState('');
+  const { lookup: keywordLookup, runLookup: runKeywordLookup } = useKeywordSetLookup(
     mode,
     location.location_code,
     location.language_code
   );
 
   const competitiveSet = useCompetitiveSet(searchedDomain);
+
+  const setDomains = useMemo(() => {
+    const seen = new Set<string>();
+    const domains: Array<{ domain: string; isTarget: boolean }> = [];
+    const pushUnique = (d: string, isTarget: boolean) => {
+      const key = d.trim().toLowerCase();
+      if (!key || seen.has(key)) return;
+      seen.add(key);
+      domains.push({ domain: d, isTarget });
+    };
+    pushUnique(searchedDomain, true);
+    competitiveSet.set.forEach((c) => pushUnique(c.domain, false));
+    return domains;
+  }, [searchedDomain, competitiveSet.set]);
+
+  function handleKeywordSearch(keyword: string) {
+    setKeywordQuery(keyword);
+    runKeywordLookup(keyword, setDomains);
+  }
+
+  function handleKeywordSearchSubmit(e: SubmitEvent) {
+    e.preventDefault();
+    handleKeywordSearch(keywordQuery);
+  }
 
   const candidates = useMemo(() => {
     return rawCandidates
@@ -453,8 +478,8 @@ export default function CompetitiveSetPage() {
                   <OverlapPanel
                     overlap={overlaps[c.domain]}
                     filterMode={filterMode}
-                    onKeywordClick={handleKeywordClick}
-                    activeKeyword={expandedKeyword}
+                    onKeywordClick={handleKeywordSearch}
+                    activeKeyword={keywordLookup?.keyword ?? null}
                   />
                 )}
               </li>
@@ -564,16 +589,32 @@ export default function CompetitiveSetPage() {
             Add
           </button>
         </form>
-      </div>
 
-      {expandedKeyword && (
-        <KeywordDetailPanel
-          keyword={expandedKeyword}
-          detail={keywordDetails[expandedKeyword]}
-          fx={fx}
-          locationLabel={location.label}
-        />
-      )}
+        <div className="mt-3 border-t border-neutral-800 pt-3">
+          <p className="text-xs font-medium text-neutral-200">Look up a keyword across your competitive set</p>
+          <p className="mt-1 text-[11px] text-neutral-600">
+            Type any keyword (e.g. &ldquo;jeans&rdquo;, &ldquo;boots&rdquo;) to see how {searchedDomain} and each confirmed
+            peer ranks for it — or click a keyword in any &ldquo;Show overlap&rdquo; table above.
+          </p>
+          <form onSubmit={handleKeywordSearchSubmit} className="mt-2 flex gap-2">
+            <input
+              type="text"
+              value={keywordQuery}
+              onChange={(e) => setKeywordQuery(e.target.value)}
+              placeholder="e.g. wide leg jeans"
+              className="flex-1 rounded-md border border-neutral-700 bg-neutral-900 px-3 py-1.5 text-xs text-neutral-100 placeholder:text-neutral-600 focus:border-neutral-500 focus:outline-none"
+            />
+            <button
+              type="submit"
+              disabled={keywordLookup?.loading}
+              className="rounded-md border border-neutral-700 px-3 py-1.5 text-xs font-medium text-neutral-200 hover:bg-neutral-800 disabled:opacity-50"
+            >
+              {keywordLookup?.loading ? 'Looking up…' : 'Look up'}
+            </button>
+          </form>
+          <CompetitiveSetKeywordPanel lookup={keywordLookup} fx={fx} />
+        </div>
+      </div>
 
       {error && (
         <div className="mt-4 rounded-md border border-rose-900 bg-rose-950/50 px-4 py-3 text-sm text-rose-300">{error}</div>
@@ -688,8 +729,8 @@ export default function CompetitiveSetPage() {
                 <OverlapPanel
                   overlap={overlap}
                   filterMode={filterMode}
-                  onKeywordClick={handleKeywordClick}
-                  activeKeyword={expandedKeyword}
+                  onKeywordClick={handleKeywordSearch}
+                  activeKeyword={keywordLookup?.keyword ?? null}
                 />
               )}
             </li>
