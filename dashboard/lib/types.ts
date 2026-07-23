@@ -155,3 +155,30 @@ export interface HistoricalRankPoint {
     organic: HistoricalRankMetrics | null;
   };
 }
+
+export interface MonthlySearchPoint {
+  year: number;
+  month: number;
+  search_volume: number;
+}
+
+export interface KeywordVolumeItem {
+  keyword: string;
+  competition: string | null; // "LOW" | "MEDIUM" | "HIGH"
+  competition_index: number | null;
+  search_volume: number | null;
+  cpc: number | null; // confirmed USD, regardless of location_code
+  low_top_of_page_bid: number | null;
+  high_top_of_page_bid: number | null;
+  monthly_searches: MonthlySearchPoint[];
+}
+
+export interface SubregionInterestValue {
+  geo_name: string;
+  value: number;
+}
+
+export interface SubregionInterestsItem {
+  keywords: string[];
+  interests: Array<{ keyword: string; values: SubregionInterestValue[] }>;
+}

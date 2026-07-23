@@ -9,7 +9,7 @@ import { FASHION_KEYWORD_REGEX } from '@/lib/keywordVocabulary';
 import { CATEGORICAL } from '@/lib/palette';
 import { BarChart } from '@/components/BarChart';
 import { useFxRate } from '@/lib/useFxRate';
-import { formatAdEquivalent } from '@/lib/currency';
+import { formatUsdToGbp } from '@/lib/currency';
 import type { CompetitorDomainItem, DomainIntersectionItem } from '@/lib/types';
 
 type SortBy = 'intersections' | 'etv';
@@ -391,7 +391,7 @@ export default function CompetitiveSetPage() {
                           {c.etv !== undefined && <> · est. traffic value {Math.round(c.etv).toLocaleString()}</>}
                           {c.estimatedPaidTrafficCost !== undefined &&
                             (() => {
-                              const { text, title } = formatAdEquivalent(c.estimatedPaidTrafficCost, fx);
+                              const { text, title } = formatUsdToGbp(c.estimatedPaidTrafficCost, fx);
                               return (
                                 <>
                                   {' '}
@@ -493,7 +493,7 @@ export default function CompetitiveSetPage() {
                             <td className="py-1.5 tabular-nums">
                               {row.adEquivalentCost !== null ? (
                                 (() => {
-                                  const { text, title } = formatAdEquivalent(row.adEquivalentCost, fx);
+                                  const { text, title } = formatUsdToGbp(row.adEquivalentCost, fx);
                                   return <span title={title}>{text}</span>;
                                 })()
                               ) : (
@@ -605,7 +605,7 @@ export default function CompetitiveSetPage() {
                     {organic?.etv !== undefined && <> · est. traffic value {Math.round(organic.etv).toLocaleString()}</>}
                     {organic?.estimated_paid_traffic_cost !== undefined &&
                       (() => {
-                        const { text, title } = formatAdEquivalent(organic.estimated_paid_traffic_cost, fx);
+                        const { text, title } = formatUsdToGbp(organic.estimated_paid_traffic_cost, fx);
                         return (
                           <>
                             {' '}
