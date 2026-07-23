@@ -488,11 +488,7 @@ export default function CompetitiveSetPage() {
                       </tbody>
                     </table>
                     <p className="mt-2 text-[11px] text-neutral-600">
-                      Every column here is from this comparison run — including manually-added peers, which now get real
-                      values instead of a blank snapshot. &ldquo;Avg position (shared)&rdquo; is averaged across up to 20 shared
-                      keywords sampled in this run, not every keyword. &ldquo;Shared keywords&rdquo; and
-                      &ldquo;% of tightest peer&rdquo; are from this comparison run. Manually-added peers show &ldquo;—&rdquo;
-                      &ldquo;% of tightest peer&rdquo; are relative to whichever peer shares the most keywords in this run.
+                      Avg position is sampled from this run's SERP data.
                     </p>
                   </div>
                 );

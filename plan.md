@@ -1,6 +1,6 @@
 # Plan — Very.co.uk Competitive Intelligence
 
-**Last updated:** 2026-07-23 (after: made the peer comparison table self-sufficient — see "What's been delivered today")
+**Last updated:** 2026-07-23 (after: LangChain relevance-filtering plan written — see [`langchain-plan.md`](langchain-plan.md) and "What's been delivered today")
 **Source brief:** colleague message re: Very's tiered peer set (for DataForSEO traffic/rank pulls) + keyword seeds mined from ~156k sampled SKU scrapes.
 **Built in:** `dashboard/` — Competitive Set, Search Visibility, and Trend Detection modules.
 **Convention:** this file gets updated every time something in the app or the underlying analysis changes — treat it as the current source of truth for status, not a point-in-time snapshot.
@@ -101,4 +101,4 @@ The brief offers to generate the full head×modifier cartesian, ranked by the te
 3. Tier 4 (value disruptors) — Trend Detection momentum pass, not Competitive Set overlap.
 4. Keyword seeds — batch the 36 phrases through Trend Detection, Apparel-scoped.
 5. Decide on the cartesian-ranking + Tranco cross-check offer (needs the brief's author, not us).
-6. Longer-term, separately noted: a LangChain Deep Agents semantic filter to replace the current vocabulary-regex approach for cleaner overlap data at scale.
+6. **LangChain relevance filtering — planned, not yet implemented.** Full plan in [`langchain-plan.md`](langchain-plan.md): replaces the vocabulary-regex keyword filter and adds a new competitor-relevance filter, both via `model.withStructuredOutput()`. Note the scope correction from earlier notes here — the actual right tool per LangChain's own docs is plain structured output, not the full Deep Agents harness (no planning/memory/subagents needed for a stateless classification call).
