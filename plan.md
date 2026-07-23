@@ -1,8 +1,9 @@
-# Very.co.uk — Peer Set & Keyword Seeds: Plan & Status
+# Plan — Very.co.uk Competitive Intelligence
 
-**Date:** 2026-07-23
+**Last updated:** 2026-07-23 (after: candidate info enrichment + filter-toggle upgrade — see "What's been delivered today")
 **Source brief:** colleague message re: Very's tiered peer set (for DataForSEO traffic/rank pulls) + keyword seeds mined from ~156k sampled SKU scrapes.
 **Built in:** `dashboard/` — Competitive Set, Search Visibility, and Trend Detection modules.
+**Convention:** this file gets updated every time something in the app or the underlying analysis changes — treat it as the current source of truth for status, not a point-in-time snapshot.
 
 ---
 
@@ -34,7 +35,8 @@
 **App features shipped as a result:**
 - Competitive Set: bulk-paste to seed a named peer list in one action (was one-domain-per-submit).
 - Competitive Set: "Show overlap" now works on manually-added/confirmed peers, not just auto-suggested candidates (previously had no effect there at all).
-- Competitive Set: "Fashion keywords only" toggle — server-side regex filter (garment vocabulary, word-boundary matched) on `domain_intersection`, no extra API cost, surfaces the real total count (e.g. "49,550 shared keywords, fashion vocabulary only") alongside the sample table. This is what caught the Argos reordering, and is reusable for any domain pair, not just Very's.
+- Competitive Set: keyword filter for "Show overlap" — a 3-state control (**None / Fashion vocabulary / LangChain — disabled, coming soon**). "Fashion vocabulary" is a server-side regex filter (garment vocabulary, word-boundary matched) on `domain_intersection`, no extra API cost, surfaces the real total count (e.g. "49,550 shared keywords, fashion vocabulary only") alongside the sample table. This is what caught the Argos reordering, and is reusable for any domain pair, not just Very's. The LangChain option is visibly present but disabled — the semantic-filter roadmap is now in the UI itself, not just this doc.
+- Competitive Set: candidate and confirmed-set rows now also show total ranking-keyword count and estimated ad-equivalent traffic value (USD — confirmed via docs, not GBP, despite UK-scoped queries), both already being fetched but previously unused.
 
 ---
 
@@ -80,8 +82,13 @@ The brief offers to generate the full head×modifier cartesian, ranked by the te
 ## What's been delivered today
 
 - Full Tier 1 analysis (visibility trend, algorithmic cross-check, pairwise overlap, ranked keywords) — real Live data, ~$1.25 total cost.
-- Three permanent app improvements: bulk-add peer domains, overlap-on-confirmed-set, fashion-keyword-only filter toggle — all verified end-to-end against the running app, not just scripted once and discarded.
 - The Argos reordering finding, which materially changes how Tier 1 should be presented.
+- Five permanent app improvements to Competitive Set, all verified end-to-end against the running app (clean typecheck/build, real Live calls through the app's own proxy, not just scripted once and discarded):
+  1. Bulk-add peer domains (paste a list instead of one-at-a-time).
+  2. "Show overlap" wired onto confirmed-set entries, not just auto-suggested candidates.
+  3. Server-side fashion-vocabulary keyword filter for overlap results.
+  4. Filter control upgraded to a 3-state toggle with a visible (disabled) LangChain option, making the semantic-filter roadmap explicit in the app.
+  5. More candidate/confirmed-set info surfaced: total ranking-keyword count, estimated ad-equivalent traffic value (USD).
 
 ## Next steps, in order
 

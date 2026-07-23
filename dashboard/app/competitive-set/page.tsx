@@ -60,7 +60,7 @@ export default function CompetitiveSetPage() {
   const { mode } = useMode();
 
   const [domain, setDomain] = useState('next.co.uk, jdwilliams.co.uk, simplybe.co.uk, studio.co.uk, freemans.com, laredoute.co.uk, argos.co.uk, very.co.uk');
-  const [searchedDomain, setSearchedDomain] = useState('next.co.uk, jdwilliams.co.uk, simplybe.co.uk, studio.co.uk, freemans.com, laredoute.co.uk, argos.co.uk, very.co.uk');
+  const [searchedDomain, setSearchedDomain] = useState('very.co.uk');
   const [location, setLocation] = useState<(typeof LOCATIONS)[number]>(LOCATIONS[0]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
