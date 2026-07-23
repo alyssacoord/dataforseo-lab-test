@@ -35,7 +35,23 @@ export function CompetitiveSetKeywordPanel({ lookup, fx }: { lookup: KeywordSetL
                     {row.domain}
                     {row.isTarget && <span className="ml-1.5 text-neutral-600">(you)</span>}
                   </td>
-                  <td className="py-1.5 pr-2 tabular-nums">{row.found ? row.position : 'not ranking'}</td>
+                  <td className="py-1.5 pr-2 tabular-nums">
+                    {row.found ? (
+                      <>
+                        {row.position}
+                        {row.source === 'live_serp' && (
+                          <span
+                            className="ml-1.5 rounded border border-neutral-700 px-1 text-[10px] font-normal text-neutral-500"
+                            title="Not in DataForSEO's indexed keyword data — confirmed instead via a real-time Google SERP check"
+                          >
+                            live SERP
+                          </span>
+                        )}
+                      </>
+                    ) : (
+                      'not ranking'
+                    )}
+                  </td>
                   <td className="py-1.5 pr-2 tabular-nums">{row.searchVolume?.toLocaleString() ?? '—'}</td>
                   <td className="py-1.5 pr-2 tabular-nums">
                     {row.cpc != null
@@ -51,8 +67,9 @@ export function CompetitiveSetKeywordPanel({ lookup, fx }: { lookup: KeywordSetL
             </tbody>
           </table>
           <p className="mt-2 text-[11px] text-neutral-600">
-            &ldquo;Not ranking&rdquo; means the domain isn&apos;t among DataForSEO&apos;s tracked top-ranking keywords for
-            this term — not necessarily zero visibility.
+            Positions tagged &ldquo;live SERP&rdquo; weren&apos;t in DataForSEO&apos;s indexed keyword data for that domain
+            but were confirmed ranking via a real-time Google check. &ldquo;Not ranking&rdquo; means neither check found
+            it — still not a guarantee of zero visibility, just nothing found within the depth checked.
           </p>
         </>
       )}

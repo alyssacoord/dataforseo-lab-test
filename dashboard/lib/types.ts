@@ -191,4 +191,13 @@ export interface KeywordDomainRank {
   searchVolume: number | null;
   cpc: number | null;
   etv: number | null;
+  // 'ranked_keywords' = DataForSEO's indexed keyword-rank data for this domain.
+  // 'live_serp' = not found there, confirmed instead via a real-time Google SERP check.
+  source: 'ranked_keywords' | 'live_serp' | null;
+}
+
+export interface OrganicSerpItem {
+  type?: string;
+  domain?: string;
+  rank_absolute?: number;
 }
