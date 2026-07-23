@@ -8,6 +8,8 @@ import { LOCATIONS } from '@/lib/locations';
 import { FASHION_KEYWORD_REGEX } from '@/lib/keywordVocabulary';
 import { CATEGORICAL } from '@/lib/palette';
 import { BarChart } from '@/components/BarChart';
+import { useFxRate } from '@/lib/useFxRate';
+import { formatAdEquivalent } from '@/lib/currency';
 import type { CompetitorDomainItem, DomainIntersectionItem } from '@/lib/types';
 
 type SortBy = 'intersections' | 'etv';
@@ -68,6 +70,7 @@ function OverlapPanel({ overlap, filterMode }: { overlap?: OverlapState; filterM
 
 export default function CompetitiveSetPage() {
   const { mode } = useMode();
+  const fx = useFxRate();
 
   const [domain, setDomain] = useState('very.co.uk');
   const [searchedDomain, setSearchedDomain] = useState('very.co.uk');
@@ -386,9 +389,16 @@ export default function CompetitiveSetPage() {
                           · {c.intersections ?? '—'} shared keywords
                           {c.count !== undefined && <> · {c.count.toLocaleString()} total ranking keywords</>}
                           {c.etv !== undefined && <> · est. traffic value {Math.round(c.etv).toLocaleString()}</>}
-                          {c.estimatedPaidTrafficCost !== undefined && (
-                            <> · ${Math.round(c.estimatedPaidTrafficCost).toLocaleString()} USD ad-equivalent</>
-                          )}
+                          {c.estimatedPaidTrafficCost !== undefined &&
+                            (() => {
+                              const { text, title } = formatAdEquivalent(c.estimatedPaidTrafficCost, fx);
+                              return (
+                                <>
+                                  {' '}
+                                  · <span title={title}>{text}</span> ad-equivalent
+                                </>
+                              );
+                            })()}
                         </>
                       )}
                     </span>
@@ -466,7 +476,7 @@ export default function CompetitiveSetPage() {
                           <th className="pb-2 font-normal">Total ranking keywords</th>
                           <th className="pb-2 font-normal">Avg position (shared)</th>
                           <th className="pb-2 font-normal">Est. traffic value</th>
-                          <th className="pb-2 font-normal">Est. ad-equivalent (USD)</th>
+                          <th className="pb-2 font-normal">Est. ad-equivalent</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -481,7 +491,14 @@ export default function CompetitiveSetPage() {
                               {row.etv !== null ? Math.round(row.etv).toLocaleString() : '—'}
                             </td>
                             <td className="py-1.5 tabular-nums">
-                              {row.adEquivalentCost !== null ? `$${Math.round(row.adEquivalentCost).toLocaleString()}` : '—'}
+                              {row.adEquivalentCost !== null ? (
+                                (() => {
+                                  const { text, title } = formatAdEquivalent(row.adEquivalentCost, fx);
+                                  return <span title={title}>{text}</span>;
+                                })()
+                              ) : (
+                                '—'
+                              )}
                             </td>
                           </tr>
                         ))}
@@ -586,9 +603,16 @@ export default function CompetitiveSetPage() {
                     {item.intersections} shared keywords · avg position {item.avg_position?.toFixed(1)}
                     {organic?.count !== undefined && <> · {organic.count.toLocaleString()} total ranking keywords</>}
                     {organic?.etv !== undefined && <> · est. traffic value {Math.round(organic.etv).toLocaleString()}</>}
-                    {organic?.estimated_paid_traffic_cost !== undefined && (
-                      <> · est. ad-equivalent value ${Math.round(organic.estimated_paid_traffic_cost).toLocaleString()} USD</>
-                    )}
+                    {organic?.estimated_paid_traffic_cost !== undefined &&
+                      (() => {
+                        const { text, title } = formatAdEquivalent(organic.estimated_paid_traffic_cost, fx);
+                        return (
+                          <>
+                            {' '}
+                            · est. ad-equivalent value <span title={title}>{text}</span>
+                          </>
+                        );
+                      })()}
                     {organic?.pos_1 !== undefined && <> · {organic.pos_1.toLocaleString()} #1 rankings</>}
                   </p>
                 </button>
