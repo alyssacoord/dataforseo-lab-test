@@ -16,7 +16,7 @@ export default function SearchVisibilityPage() {
   const [location, setLocation] = useState<(typeof LOCATIONS)[number]>(LOCATIONS[0]);
 
   // --- Section 1: visibility over time, multiple domains ---
-  const [domainsInput, setDomainsInput] = useState('coordclothing.co.uk, asos.com, hm.com');
+  const [domainsInput, setDomainsInput] = useState('very.co.uk');
   const [visibilityLoading, setVisibilityLoading] = useState(false);
   const [visibilityError, setVisibilityError] = useState<string | null>(null);
   const [visibilityByDomain, setVisibilityByDomain] = useState<Record<string, HistoricalRankPoint[]>>({});

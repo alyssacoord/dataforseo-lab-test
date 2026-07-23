@@ -17,7 +17,8 @@ interface LineChartProps {
 }
 
 const VIEW_WIDTH = 640;
-const PAD_LEFT = 34;
+const MIN_PAD_LEFT = 34; // enough for a narrow scale like Trend Detection's 0-100 index
+const CHAR_WIDTH_PX = 5.2; // rough average glyph width at fontSize 9, digits + comma
 const PAD_RIGHT = 12;
 const PAD_TOP = 12;
 const PAD_BOTTOM = 26;
@@ -40,24 +41,30 @@ export function LineChart({ labels, series, values, height = 220, yMax }: LineCh
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
 
   const n = labels.length;
-  const plotWidth = VIEW_WIDTH - PAD_LEFT - PAD_RIGHT;
   const plotHeight = height - PAD_TOP - PAD_BOTTOM;
 
   const resolvedYMax =
     yMax ??
     niceMax(Math.max(...values.flat().filter((v): v is number => v !== null && v !== undefined), 1));
 
-  const xAt = (i: number) => PAD_LEFT + (n <= 1 ? 0 : (i / (n - 1)) * plotWidth);
-  const yAt = (v: number) => PAD_TOP + (1 - v / resolvedYMax) * plotHeight;
-
   const gridSteps = [0, 0.25, 0.5, 0.75, 1].map((f) => Math.round(resolvedYMax * f));
+
+  // Left padding scales with the widest tick label so large numbers (thousands+) don't
+  // render past x=0 and get clipped by the SVG viewBox — that's what "blank axis" was.
+  const widestTickChars = Math.max(...gridSteps.map((s) => formatTick(s).length));
+  const padLeft = Math.max(MIN_PAD_LEFT, Math.ceil(widestTickChars * CHAR_WIDTH_PX) + 16);
+
+  const plotWidth = VIEW_WIDTH - padLeft - PAD_RIGHT;
+
+  const xAt = (i: number) => padLeft + (n <= 1 ? 0 : (i / (n - 1)) * plotWidth);
+  const yAt = (v: number) => PAD_TOP + (1 - v / resolvedYMax) * plotHeight;
 
   function handleMove(e: React.MouseEvent<SVGSVGElement>) {
     const svg = svgRef.current;
     if (!svg || n === 0) return;
     const rect = svg.getBoundingClientRect();
     const relX = ((e.clientX - rect.left) / rect.width) * VIEW_WIDTH;
-    const ratio = n <= 1 ? 0 : (relX - PAD_LEFT) / plotWidth;
+    const ratio = n <= 1 ? 0 : (relX - padLeft) / plotWidth;
     const idx = Math.round(ratio * (n - 1));
     setHoverIndex(Math.min(n - 1, Math.max(0, idx)));
   }
@@ -77,14 +84,14 @@ export function LineChart({ labels, series, values, height = 220, yMax }: LineCh
         {gridSteps.map((step) => (
           <g key={step}>
             <line
-              x1={PAD_LEFT}
+              x1={padLeft}
               x2={VIEW_WIDTH - PAD_RIGHT}
               y1={yAt(step)}
               y2={yAt(step)}
               stroke={CHART_TOKENS.gridline}
               strokeWidth={1}
             />
-            <text x={PAD_LEFT - 8} y={yAt(step) + 3} textAnchor="end" fontSize={9} fill={CHART_TOKENS.textMuted}>
+            <text x={padLeft - 8} y={yAt(step) + 3} textAnchor="end" fontSize={9} fill={CHART_TOKENS.textMuted}>
               {formatTick(step)}
             </text>
           </g>
