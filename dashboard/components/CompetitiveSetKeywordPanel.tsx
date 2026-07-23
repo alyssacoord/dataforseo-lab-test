@@ -10,6 +10,18 @@ export function CompetitiveSetKeywordPanel({ lookup, fx }: { lookup: KeywordSetL
   return (
     <div className="mt-3 rounded-md border border-neutral-800 bg-neutral-950/40 p-3">
       <p className="text-xs font-medium text-neutral-200">&ldquo;{lookup.keyword}&rdquo; across your competitive set</p>
+      {(lookup.searchVolume != null || lookup.cpc != null) && (
+        <p className="mt-1 text-[11px] text-neutral-500">
+          {lookup.searchVolume != null && <>{lookup.searchVolume.toLocaleString()} searches/mo</>}
+          {lookup.searchVolume != null && lookup.cpc != null && ' · '}
+          {lookup.cpc != null &&
+            (() => {
+              const { text, title } = formatUsdToGbp(lookup.cpc as number, fx, 2);
+              return <span title={title}>{text} CPC</span>;
+            })()}
+          <span className="ml-1 text-neutral-600">— same for every domain, a property of the keyword, not the site</span>
+        </p>
+      )}
 
       {lookup.loading ? (
         <p className="mt-2 text-xs text-neutral-500">Looking up…</p>
@@ -23,8 +35,6 @@ export function CompetitiveSetKeywordPanel({ lookup, fx }: { lookup: KeywordSetL
               <tr className="text-neutral-500">
                 <th className="pb-2 font-normal">Domain</th>
                 <th className="pb-2 font-normal">Position</th>
-                <th className="pb-2 font-normal">Search volume</th>
-                <th className="pb-2 font-normal">CPC</th>
                 <th className="pb-2 font-normal">Est. traffic (ETV)</th>
               </tr>
             </thead>
@@ -51,15 +61,6 @@ export function CompetitiveSetKeywordPanel({ lookup, fx }: { lookup: KeywordSetL
                     ) : (
                       'not ranking'
                     )}
-                  </td>
-                  <td className="py-1.5 pr-2 tabular-nums">{row.searchVolume?.toLocaleString() ?? '—'}</td>
-                  <td className="py-1.5 pr-2 tabular-nums">
-                    {row.cpc != null
-                      ? (() => {
-                          const { text, title } = formatUsdToGbp(row.cpc as number, fx, 2);
-                          return <span title={title}>{text}</span>;
-                        })()
-                      : '—'}
                   </td>
                   <td className="py-1.5 tabular-nums">{row.etv != null ? Math.round(row.etv).toLocaleString() : '—'}</td>
                 </tr>

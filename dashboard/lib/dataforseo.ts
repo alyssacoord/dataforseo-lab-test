@@ -38,7 +38,17 @@ export async function runDataForSEO<T = unknown>(params: RunParams): Promise<Pro
 }
 
 export function extractItems<T>(result: ProxyResult<T>): T[] {
-  return result.data?.tasks?.[0]?.result?.[0]?.items ?? [];
+  const taskResult = result.data?.tasks?.[0]?.result;
+  if (!taskResult) return [];
+  const first = taskResult[0];
+  // Most endpoints wrap their items in result[0].items. A few (e.g.
+  // keywords_data/google_ads/search_volume/live) return `result` itself as a
+  // flat array of item objects, with no items/items_count wrapper at all —
+  // detect that shape and fall back to treating `result` as the item list.
+  if (first && typeof first === 'object' && 'items' in first) {
+    return (first.items as T[] | undefined) ?? [];
+  }
+  return (taskResult as unknown[]).filter((item): item is T => item != null);
 }
 
 export function extractTotalCount<T>(result: ProxyResult<T>): number | null {

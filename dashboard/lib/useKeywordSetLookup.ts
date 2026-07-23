@@ -2,12 +2,15 @@
 
 import { useState } from 'react';
 import { runDataForSEO, extractItems, extractError, type Mode } from './dataforseo';
-import type { RankedKeywordItem, KeywordDomainRank, OrganicSerpItem } from './types';
+import type { RankedKeywordItem, KeywordDomainRank, OrganicSerpItem, KeywordVolumeItem } from './types';
 
 export interface KeywordSetLookupState {
   loading: boolean;
   error: string | null;
   keyword: string;
+  // Keyword-level facts (not domain-specific) — shown once, not per row.
+  searchVolume: number | null;
+  cpc: number | null;
   rows: KeywordDomainRank[];
 }
 
@@ -50,7 +53,7 @@ export function useKeywordSetLookup(mode: Mode, locationCode: number, languageCo
     const normalized = trimmed.toLowerCase();
     if (!trimmed || domains.length === 0) return;
 
-    setLookup({ loading: true, error: null, keyword: trimmed, rows: [] });
+    setLookup({ loading: true, error: null, keyword: trimmed, searchVolume: null, cpc: null, rows: [] });
 
     const results = await Promise.all(
       domains.map(async ({ domain, isTarget }) => {
@@ -72,27 +75,40 @@ export function useKeywordSetLookup(mode: Mode, locationCode: number, languageCo
     );
 
     const errors: string[] = [];
+    let knownVolume: number | null = null;
+    let knownCpc: number | null = null;
     let rows: KeywordDomainRank[] = results.map(({ domain, isTarget, result }) => {
       const err = extractError(result);
       if (err) errors.push(`${domain}: ${err}`);
       const item = err ? null : (extractItems(result)[0] ?? null);
       const serpItem = item?.ranked_serp_element?.serp_item;
+      knownVolume = knownVolume ?? item?.keyword_data.keyword_info?.search_volume ?? null;
+      knownCpc = knownCpc ?? item?.keyword_data.keyword_info?.cpc ?? null;
       return {
         domain,
         isTarget,
         found: item != null,
         position: serpItem?.rank_absolute ?? null,
-        searchVolume: item?.keyword_data.keyword_info?.search_volume ?? null,
-        cpc: item?.keyword_data.keyword_info?.cpc ?? null,
         etv: serpItem?.etv ?? null,
         source: item != null ? 'ranked_keywords' : null,
       };
     });
 
-    // Borrow real keyword-level stats (volume/CPC aren't domain-specific) for
-    // rows a live SERP match will resolve below, which has no keyword_info of its own.
-    const knownVolume = rows.find((r) => r.searchVolume != null)?.searchVolume ?? null;
-    const knownCpc = rows.find((r) => r.cpc != null)?.cpc ?? null;
+    // No domain's ranked_keywords call had this keyword indexed at all (e.g. a
+    // longer-tail phrase none of the set is tracked for yet) — fetch keyword-level
+    // volume/CPC directly rather than leaving every row blank.
+    if (knownVolume == null || knownCpc == null) {
+      const volumeResult = await runDataForSEO<KeywordVolumeItem>({
+        path: 'keywords_data/google_ads/search_volume/live',
+        mode,
+        body: [{ keywords: [normalized], location_code: locationCode, language_code: languageCode }],
+      });
+      if (!extractError(volumeResult)) {
+        const volumeItem = extractItems(volumeResult)[0] ?? null;
+        knownVolume = knownVolume ?? volumeItem?.search_volume ?? null;
+        knownCpc = knownCpc ?? volumeItem?.cpc ?? null;
+      }
+    }
 
     let serpWarning: string | null = null;
     const stillUnresolved = rows.filter((r) => !r.found);
@@ -115,8 +131,6 @@ export function useKeywordSetLookup(mode: Mode, locationCode: number, languageCo
             ...row,
             found: true,
             position: match.rank_absolute ?? null,
-            searchVolume: row.searchVolume ?? knownVolume,
-            cpc: row.cpc ?? knownCpc,
             source: 'live_serp',
           };
         });
@@ -133,6 +147,8 @@ export function useKeywordSetLookup(mode: Mode, locationCode: number, languageCo
       loading: false,
       error: blockingError ?? serpWarning,
       keyword: trimmed,
+      searchVolume: knownVolume,
+      cpc: knownCpc,
       rows: sortRows(rows),
     });
   }
