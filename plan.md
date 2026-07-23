@@ -1,6 +1,6 @@
 # Plan — Very.co.uk Competitive Intelligence
 
-**Last updated:** 2026-07-23 (after: candidate info enrichment + filter-toggle upgrade — see "What's been delivered today")
+**Last updated:** 2026-07-23 (after: "Compare all" peer overlap chart — see "What's been delivered today")
 **Source brief:** colleague message re: Very's tiered peer set (for DataForSEO traffic/rank pulls) + keyword seeds mined from ~156k sampled SKU scrapes.
 **Built in:** `dashboard/` — Competitive Set, Search Visibility, and Trend Detection modules.
 **Convention:** this file gets updated every time something in the app or the underlying analysis changes — treat it as the current source of truth for status, not a point-in-time snapshot.
@@ -83,12 +83,13 @@ The brief offers to generate the full head×modifier cartesian, ranked by the te
 
 - Full Tier 1 analysis (visibility trend, algorithmic cross-check, pairwise overlap, ranked keywords) — real Live data, ~$1.25 total cost.
 - The Argos reordering finding, which materially changes how Tier 1 should be presented.
-- Five permanent app improvements to Competitive Set, all verified end-to-end against the running app (clean typecheck/build, real Live calls through the app's own proxy, not just scripted once and discarded):
+- Six permanent app improvements to Competitive Set, all verified end-to-end against the running app (clean typecheck/build, real Live calls through the app's own proxy, not just scripted once and discarded):
   1. Bulk-add peer domains (paste a list instead of one-at-a-time).
   2. "Show overlap" wired onto confirmed-set entries, not just auto-suggested candidates.
   3. Server-side fashion-vocabulary keyword filter for overlap results.
   4. Filter control upgraded to a 3-state toggle with a visible (disabled) LangChain option, making the semantic-filter roadmap explicit in the app.
   5. More candidate/confirmed-set info surfaced: total ranking-keyword count, estimated ad-equivalent traffic value (USD).
+  6. "Compare all" — one button runs the overlap comparison for the whole confirmed peer set in parallel and renders a single ranked bar chart (shared-keyword tightness), instead of clicking "Show overlap" on each peer individually. This is the slide-deck-ready view of the Tier 1 finding — screenshot-able directly, no manual assembly. Also fixed a pre-existing `BarChart` bug (missing thousands separators on value labels) surfaced while building this.
 
 ## Next steps, in order
 
