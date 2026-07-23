@@ -1,7 +1,7 @@
 # LangChain-Based Relevance Filtering — Competitors & Keywords
 
 **Status:** Planned, not yet implemented.
-**Source:** research via `langchain-skills:ecosystem-primer`, `deep-agents-core`, `langchain-fundamentals`, `langchain-dependencies` — fetched live, not assumed from training data.
+**Source:** research via `langchain-skills:ecosystem-primer`, `deep-agents-core`, `langchain-fundamentals`, `langchain-middleware`, `langchain-dependencies` — fetched live (re-verified 2026-07-23), not assumed from training data.
 
 ## Context
 
@@ -28,6 +28,8 @@ Minimal set for this scope:
 - `zod` — not currently used anywhere in this app; net-new.
 
 Not needed for this scope: `langchain` (agents/chains/retrieval — no agent loop here), `@langchain/langgraph` / `deepagents` (no orchestration needed).
+
+**Worth flagging:** `langchain-dependencies`'s own minimal-project template lists `langchain` + `langsmith` as "always required" baseline packages, on the assumption most projects eventually reach for `create_agent`/chains. Deliberately going narrower here since this scope never does — the only genuinely required packages for `model.withStructuredOutput()` are the provider package and `@langchain/core`. `zod` for schema validation, and optionally `langsmith` if choice 5 below (tracing) is turned on.
 
 ```bash
 cd dashboard && npm install @langchain/anthropic @langchain/core zod
@@ -101,6 +103,30 @@ export interface RelevanceJudgment { item: string; relevant: boolean; reason: st
 
 This adds a **second real per-call cost** on top of DataForSEO's: every "Show overlap"/"Compare all" run in LangChain mode fires one Anthropic call (batched — one call per keyword-list or per candidate-list, not per item), and every competitor-list "Filter with LangChain" click fires one more. Haiku keeps this cheap, but it's a different bill (Anthropic) than the DataForSEO one already being tracked in `plan.md`.
 
-## Open question before implementing
+## Plan choices — decide before implementing
 
-Model choice (Haiku 4.5 default, recommended) and scope (build both keyword *and* competitor filtering in one pass, since both were explicitly requested) are decisions made in this plan, not yet confirmed with you. Flag if either should change before implementation starts.
+Five separate decision points, each with a recommendation already reflected in the "Approach" section above. Flag any you want changed before implementation starts — the rest of this doc assumes the recommended (**bold**) option at each point.
+
+### 1. Implementation layer
+Re-confirmed directly against `ecosystem-primer`'s own decision table (Step 1): "pure model call... with no agent loop" routes to plain LangChain, bottom layer — exactly this case, since there's no tool use, no multi-step reasoning, just one classification call.
+- **A. Structured output only — `model.withStructuredOutput(zodSchema)`, no agent loop, no tools (recommended, and what's spec'd above).** One call in, one validated judgment list out. Cheapest, simplest, no `langchain`/`@langchain/langgraph`/`deepagents` dependency. Right fit because this is pure classification — nothing to plan, remember, or delegate.
+- **B. `create_agent` with `response_format: JudgmentSchema` (the actual current param name, confirmed via `langchain-fundamentals`).** Gets the same validated-object result (`result.structured_response` / `result.structuredResponse`) but via the full agent loop, which means pulling in `langchain` proper and giving the model tools to call mid-judgment — e.g. a tool that checks a domain's actual product categories before ruling on relevance, instead of judging from the keyword/domain string alone. Real quality upside for ambiguous cases, at the cost of a slower, more expensive multi-turn call per batch, and a dependency this scope doesn't otherwise need.
+- **C. Full Deep Agents harness (`createDeepAgent`).** Only makes sense if this grows into multi-step reasoning across a whole competitive-brief workflow (planning, memory, subagent delegation) rather than a single relevance call. Confirmed available as a real TypeScript build (`createDeepAgent` from `deepagents`), not a platform gap — just the wrong layer for this scope, per `deep-agents-core`'s own decision table (re-confirmed: "context fits in a single prompt" / "single agent is sufficient" / "ephemeral, single-session work" all point away from Deep Agents here).
+
+### 2. Model
+- **A. Claude Haiku 4.5 (recommended, and what's spec'd above).** Cheap, fast, sufficient for a relevance yes/no with a one-line reason.
+- **B. Claude Sonnet 5.** Worth switching to if Haiku's judgment calls on genuinely ambiguous cases (e.g. borderline general-merchandise sites, keywords that are half brand-name half category) turn out wrong often enough in testing (step 1 of the verification plan below) to matter. Straightforward swap — one string in `relevanceFilter.ts`.
+
+### 3. Scope / rollout order
+- **A. Ship keyword filtering and competitor filtering together in one pass (recommended, and what's spec'd above).** Matches the original ask ("filtering the irrelevant competitors, keywords") and both use cases share the same helper/route, so there's little marginal cost to doing both at once.
+- **B. Keyword filtering first, competitor filtering as a fast-follow.** Lower-risk if you'd rather verify the classifier's judgment quality on one surface (the already-built, currently-disabled "LangChain" toggle) before extending it to a second.
+- **C. Competitor filtering first.** Arguably the bigger real gap today — keyword overlap already has a working regex filter as a fallback, while the competitor-candidates list has no relevance filtering at all beyond a numeric threshold, so marketplaces/platforms show up unfiltered right now.
+
+### 4. Fallback behavior when the Anthropic call errors or times out
+- **A. Fall back to showing everything unfiltered, with a visible inline error (recommended, and what's spec'd above).** Matches the transparency/no-silent-failure discipline already established everywhere else in this app (e.g. the FX-rate USD fallback, the live-SERP warning text) — never hide data because a call failed, always say so.
+- **B. Fall back to the existing regex filter automatically.** Keeps *some* filtering active on failure rather than none, at the cost of silently swapping filter logic under the user without them choosing it — a real tradeoff against the "always visible, never silent" pattern this app has followed so far.
+
+### 5. LangSmith tracing — new consideration, not in the original plan
+`ecosystem-primer` is explicit that LangSmith should be set up "always... alongside any of" the three layers, for observability — this wasn't in scope before this round of research and is worth deciding on explicitly rather than silently adding or silently skipping.
+- **A. Skip it (recommended for this scope, and what's spec'd above).** One Anthropic call per batch with a Zod-validated response is easy to debug from the API route's own response/error handling alone — the same level of observability every DataForSEO call in this app already gets (logged via the dev server, inspected with `curl`). Adding a third external account/dependency (`langsmith` package + `LANGSMITH_API_KEY`) for a single-call classifier is arguably more setup than the thing being observed.
+- **B. Wire it up** — `npm install langsmith`, set `LANGSMITH_API_KEY` / `LANGSMITH_TRACING=true` / `LANGSMITH_PROJECT` (current env var names, confirmed live — older names from pre-1.0 docs no longer work). Worth it if judgment quality drifting over time is a real concern — gives a searchable history of every relevance call, the exact prompt, and the model's reasoning, without having to reproduce a bad judgment manually to debug it. Real value if this expands beyond the two use cases here.
