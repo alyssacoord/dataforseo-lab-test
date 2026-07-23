@@ -100,7 +100,7 @@ export function useKeywordSetLookup(mode: Mode, locationCode: number, languageCo
       const serpResult = await runDataForSEO<OrganicSerpItem>({
         path: 'serp/google/organic/live/advanced',
         mode,
-        body: [{ keyword: trimmed, location_code: locationCode, language_code: languageCode, depth: 100 }],
+        body: [{ keyword: trimmed, location_code: locationCode, language_code: languageCode, depth: 200 }],
       });
       const serpErr = extractError(serpResult);
       if (!serpErr) {
