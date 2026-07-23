@@ -10,6 +10,8 @@ import { CATEGORICAL } from '@/lib/palette';
 import { BarChart } from '@/components/BarChart';
 import { useFxRate } from '@/lib/useFxRate';
 import { formatUsdToGbp } from '@/lib/currency';
+import { useKeywordDetail } from '@/lib/useKeywordDetail';
+import { KeywordDetailPanel } from '@/components/KeywordDetailPanel';
 import type { CompetitorDomainItem, DomainIntersectionItem } from '@/lib/types';
 
 type SortBy = 'intersections' | 'etv';
@@ -30,7 +32,17 @@ interface ComparisonRow {
   adEquivalentCost: number | null; // peer's own ad-equivalent value
 }
 
-function OverlapPanel({ overlap, filterMode }: { overlap?: OverlapState; filterMode: FilterMode }) {
+function OverlapPanel({
+  overlap,
+  filterMode,
+  onKeywordClick,
+  activeKeyword,
+}: {
+  overlap?: OverlapState;
+  filterMode: FilterMode;
+  onKeywordClick: (keyword: string) => void;
+  activeKeyword: string | null;
+}) {
   if (!overlap) return null;
   if (overlap.loading) return <p className="px-4 py-3 text-xs text-neutral-500">Loading overlapping keywords…</p>;
   if (overlap.error) return <p className="px-4 py-3 text-xs text-rose-400">{overlap.error}</p>;
@@ -41,7 +53,7 @@ function OverlapPanel({ overlap, filterMode }: { overlap?: OverlapState; filterM
       {overlap.totalCount !== null && (
         <p className="mb-2 text-[11px] text-neutral-600">
           {overlap.totalCount.toLocaleString()} shared keywords total{filterMode === 'regex' ? ' (fashion vocabulary only)' : ''}{' '}
-          — showing top {overlap.items.length} by volume
+          — showing top {overlap.items.length} by volume. Click a keyword for its full detail.
         </p>
       )}
       <table className="w-full text-left text-xs">
@@ -54,14 +66,25 @@ function OverlapPanel({ overlap, filterMode }: { overlap?: OverlapState; filterM
           </tr>
         </thead>
         <tbody>
-          {overlap.items.slice(0, 10).map((kw, i) => (
-            <tr key={`${kw.keyword_data.keyword}-${i}`} className="border-t border-neutral-800/60 text-neutral-300">
-              <td className="py-1.5 pr-2">{kw.keyword_data.keyword}</td>
-              <td className="py-1.5 pr-2">{kw.keyword_data.keyword_info?.search_volume ?? '—'}</td>
-              <td className="py-1.5 pr-2">{kw.first_domain_serp_element?.rank_absolute ?? '—'}</td>
-              <td className="py-1.5">{kw.second_domain_serp_element?.rank_absolute ?? '—'}</td>
-            </tr>
-          ))}
+          {overlap.items.slice(0, 10).map((kw, i) => {
+            const keyword = kw.keyword_data.keyword;
+            return (
+              <tr key={`${keyword}-${i}`} className="border-t border-neutral-800/60 text-neutral-300">
+                <td className="py-1.5 pr-2">
+                  <button
+                    type="button"
+                    onClick={() => onKeywordClick(keyword)}
+                    className={`text-left hover:underline ${activeKeyword === keyword ? 'font-medium text-neutral-100' : ''}`}
+                  >
+                    {keyword}
+                  </button>
+                </td>
+                <td className="py-1.5 pr-2">{kw.keyword_data.keyword_info?.search_volume ?? '—'}</td>
+                <td className="py-1.5 pr-2">{kw.first_domain_serp_element?.rank_absolute ?? '—'}</td>
+                <td className="py-1.5">{kw.second_domain_serp_element?.rank_absolute ?? '—'}</td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
@@ -91,6 +114,12 @@ export default function CompetitiveSetPage() {
   const [comparisonLoading, setComparisonLoading] = useState(false);
   const [comparisonError, setComparisonError] = useState<string | null>(null);
   const [comparisonResults, setComparisonResults] = useState<Record<string, ComparisonRow | null>>({});
+
+  const { expandedKeyword, keywordDetails, handleKeywordClick } = useKeywordDetail(
+    mode,
+    location.location_code,
+    location.language_code
+  );
 
   const competitiveSet = useCompetitiveSet(searchedDomain);
 
@@ -420,7 +449,14 @@ export default function CompetitiveSetPage() {
                     </button>
                   </div>
                 </div>
-                {expanded === c.domain && <OverlapPanel overlap={overlaps[c.domain]} filterMode={filterMode} />}
+                {expanded === c.domain && (
+                  <OverlapPanel
+                    overlap={overlaps[c.domain]}
+                    filterMode={filterMode}
+                    onKeywordClick={handleKeywordClick}
+                    activeKeyword={expandedKeyword}
+                  />
+                )}
               </li>
             ))}
           </ul>
@@ -529,6 +565,15 @@ export default function CompetitiveSetPage() {
           </button>
         </form>
       </div>
+
+      {expandedKeyword && (
+        <KeywordDetailPanel
+          keyword={expandedKeyword}
+          detail={keywordDetails[expandedKeyword]}
+          fx={fx}
+          locationLabel={location.label}
+        />
+      )}
 
       {error && (
         <div className="mt-4 rounded-md border border-rose-900 bg-rose-950/50 px-4 py-3 text-sm text-rose-300">{error}</div>
@@ -639,7 +684,14 @@ export default function CompetitiveSetPage() {
                 </div>
               </div>
 
-              {isOpen && <OverlapPanel overlap={overlap} filterMode={filterMode} />}
+              {isOpen && (
+                <OverlapPanel
+                  overlap={overlap}
+                  filterMode={filterMode}
+                  onKeywordClick={handleKeywordClick}
+                  activeKeyword={expandedKeyword}
+                />
+              )}
             </li>
           );
         })}
