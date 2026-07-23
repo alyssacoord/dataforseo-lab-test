@@ -15,11 +15,43 @@ interface OverlapState {
   items: DomainIntersectionItem[];
 }
 
+function OverlapPanel({ overlap }: { overlap?: OverlapState }) {
+  if (!overlap) return null;
+  if (overlap.loading) return <p className="px-4 py-3 text-xs text-neutral-500">Loading overlapping keywords…</p>;
+  if (overlap.error) return <p className="px-4 py-3 text-xs text-rose-400">{overlap.error}</p>;
+  if (overlap.items.length === 0) return <p className="px-4 py-3 text-xs text-neutral-500">No overlapping keywords returned.</p>;
+
+  return (
+    <div className="border-t border-neutral-800 px-4 py-3">
+      <table className="w-full text-left text-xs">
+        <thead>
+          <tr className="text-neutral-500">
+            <th className="pb-2 font-normal">Keyword</th>
+            <th className="pb-2 font-normal">Volume</th>
+            <th className="pb-2 font-normal">Your position</th>
+            <th className="pb-2 font-normal">Their position</th>
+          </tr>
+        </thead>
+        <tbody>
+          {overlap.items.slice(0, 10).map((kw, i) => (
+            <tr key={`${kw.keyword_data.keyword}-${i}`} className="border-t border-neutral-800/60 text-neutral-300">
+              <td className="py-1.5 pr-2">{kw.keyword_data.keyword}</td>
+              <td className="py-1.5 pr-2">{kw.keyword_data.keyword_info?.search_volume ?? '—'}</td>
+              <td className="py-1.5 pr-2">{kw.first_domain_serp_element?.rank_absolute ?? '—'}</td>
+              <td className="py-1.5">{kw.second_domain_serp_element?.rank_absolute ?? '—'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export default function CompetitiveSetPage() {
   const { mode } = useMode();
 
-  const [domain, setDomain] = useState('asos.com');
-  const [searchedDomain, setSearchedDomain] = useState('asos.com');
+  const [domain, setDomain] = useState('next.co.uk, jdwilliams.co.uk, simplybe.co.uk, studio.co.uk, freemans.com, laredoute.co.uk, argos.co.uk, very.co.uk');
+  const [searchedDomain, setSearchedDomain] = useState('next.co.uk, jdwilliams.co.uk, simplybe.co.uk, studio.co.uk, freemans.com, laredoute.co.uk, argos.co.uk, very.co.uk');
   const [location, setLocation] = useState<(typeof LOCATIONS)[number]>(LOCATIONS[0]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -128,9 +160,12 @@ export default function CompetitiveSetPage() {
 
   function handleManualAdd(e: SubmitEvent) {
     e.preventDefault();
-    const target = manualDomain.trim();
-    if (!target) return;
-    competitiveSet.add({ domain: target, addedAt: new Date().toISOString(), source: 'manual' });
+    const targets = manualDomain
+      .split(/[,\n]/)
+      .map((d) => d.trim())
+      .filter(Boolean);
+    if (targets.length === 0) return;
+    targets.forEach((target) => competitiveSet.add({ domain: target, addedAt: new Date().toISOString(), source: 'manual' }));
     setManualDomain('');
   }
 
@@ -190,44 +225,53 @@ export default function CompetitiveSetPage() {
 
         {competitiveSet.set.length === 0 ? (
           <p className="mt-2 text-xs text-neutral-500">
-            Nothing confirmed yet. Add suggestions from the list below, or add a brand directly.
+            Nothing confirmed yet. Add suggestions from the list below, or add brands directly.
           </p>
         ) : (
           <ul className="mt-3 space-y-1.5">
             {competitiveSet.set.map((c) => (
-              <li
-                key={c.domain}
-                className="flex items-center justify-between rounded-md bg-neutral-950/60 px-3 py-2 text-xs text-neutral-200"
-              >
-                <span>
-                  {c.domain}{' '}
-                  <span className="text-neutral-600">
-                    {c.source === 'manual' ? '· added manually' : `· ${c.intersections ?? '—'} shared keywords`}
+              <li key={c.domain} className="rounded-md bg-neutral-950/60 text-xs text-neutral-200">
+                <div className="flex items-center justify-between px-3 py-2">
+                  <span>
+                    {c.domain}{' '}
+                    <span className="text-neutral-600">
+                      {c.source === 'manual' ? '· added manually' : `· ${c.intersections ?? '—'} shared keywords`}
+                    </span>
                   </span>
-                </span>
-                <button
-                  type="button"
-                  onClick={() => competitiveSet.remove(c.domain)}
-                  className="text-neutral-500 hover:text-rose-400"
-                >
-                  Remove
-                </button>
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => handleExpand(c.domain)}
+                      className="text-neutral-500 hover:text-neutral-300"
+                    >
+                      {expanded === c.domain ? 'Hide overlap ▲' : 'Show overlap ▾'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => competitiveSet.remove(c.domain)}
+                      className="text-neutral-500 hover:text-rose-400"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+                {expanded === c.domain && <OverlapPanel overlap={overlaps[c.domain]} />}
               </li>
             ))}
           </ul>
         )}
 
         <form onSubmit={handleManualAdd} className="mt-3 flex gap-2">
-          <input
-            type="text"
+          <textarea
             value={manualDomain}
             onChange={(e) => setManualDomain(e.target.value)}
-            placeholder="add a brand manually, e.g. hm.com"
-            className="flex-1 rounded-md border border-neutral-700 bg-neutral-900 px-3 py-1.5 text-xs text-neutral-100 placeholder:text-neutral-600 focus:border-neutral-500 focus:outline-none"
+            placeholder="add brands directly — one, or paste several separated by commas or new lines, e.g. next.co.uk, argos.co.uk"
+            rows={2}
+            className="flex-1 resize-none rounded-md border border-neutral-700 bg-neutral-900 px-3 py-1.5 text-xs text-neutral-100 placeholder:text-neutral-600 focus:border-neutral-500 focus:outline-none"
           />
           <button
             type="submit"
-            className="rounded-md border border-neutral-700 px-3 py-1.5 text-xs font-medium text-neutral-200 hover:bg-neutral-800"
+            className="self-start rounded-md border border-neutral-700 px-3 py-1.5 text-xs font-medium text-neutral-200 hover:bg-neutral-800"
           >
             Add
           </button>
@@ -332,37 +376,7 @@ export default function CompetitiveSetPage() {
                 </div>
               </div>
 
-              {isOpen && (
-                <div className="border-t border-neutral-800 px-4 py-3">
-                  {overlap?.loading && <p className="text-xs text-neutral-500">Loading overlapping keywords…</p>}
-                  {overlap?.error && <p className="text-xs text-rose-400">{overlap.error}</p>}
-                  {overlap && !overlap.loading && !overlap.error && overlap.items.length === 0 && (
-                    <p className="text-xs text-neutral-500">No overlapping keywords returned.</p>
-                  )}
-                  {overlap && overlap.items.length > 0 && (
-                    <table className="w-full text-left text-xs">
-                      <thead>
-                        <tr className="text-neutral-500">
-                          <th className="pb-2 font-normal">Keyword</th>
-                          <th className="pb-2 font-normal">Volume</th>
-                          <th className="pb-2 font-normal">Your position</th>
-                          <th className="pb-2 font-normal">Their position</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {overlap.items.slice(0, 10).map((kw, i) => (
-                          <tr key={`${kw.keyword_data.keyword}-${i}`} className="border-t border-neutral-800/60 text-neutral-300">
-                            <td className="py-1.5 pr-2">{kw.keyword_data.keyword}</td>
-                            <td className="py-1.5 pr-2">{kw.keyword_data.keyword_info?.search_volume ?? '—'}</td>
-                            <td className="py-1.5 pr-2">{kw.first_domain_serp_element?.rank_absolute ?? '—'}</td>
-                            <td className="py-1.5">{kw.second_domain_serp_element?.rank_absolute ?? '—'}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  )}
-                </div>
-              )}
+              {isOpen && <OverlapPanel overlap={overlap} />}
             </li>
           );
         })}
