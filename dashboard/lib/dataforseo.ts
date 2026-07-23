@@ -3,7 +3,7 @@ export type Mode = 'sandbox' | 'live';
 export interface DataForSEOTask<T> {
   status_code?: number;
   status_message?: string;
-  result?: Array<{ items?: T[] } & Record<string, unknown>> | null;
+  result?: Array<{ items?: T[]; total_count?: number } & Record<string, unknown>> | null;
 }
 
 export interface DataForSEOEnvelope<T> {
@@ -39,6 +39,10 @@ export async function runDataForSEO<T = unknown>(params: RunParams): Promise<Pro
 
 export function extractItems<T>(result: ProxyResult<T>): T[] {
   return result.data?.tasks?.[0]?.result?.[0]?.items ?? [];
+}
+
+export function extractTotalCount<T>(result: ProxyResult<T>): number | null {
+  return result.data?.tasks?.[0]?.result?.[0]?.total_count ?? null;
 }
 
 export function extractError<T>(result: ProxyResult<T>): string | null {

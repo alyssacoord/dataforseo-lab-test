@@ -2,9 +2,10 @@
 
 import { useMemo, useState, type MouseEvent, type SubmitEvent } from 'react';
 import { useMode } from '@/components/ModeProvider';
-import { runDataForSEO, extractItems, extractError } from '@/lib/dataforseo';
+import { runDataForSEO, extractItems, extractError, extractTotalCount } from '@/lib/dataforseo';
 import { useCompetitiveSet } from '@/lib/useCompetitiveSet';
 import { LOCATIONS } from '@/lib/locations';
+import { FASHION_KEYWORD_REGEX } from '@/lib/keywordVocabulary';
 import type { CompetitorDomainItem, DomainIntersectionItem } from '@/lib/types';
 
 type SortBy = 'intersections' | 'etv';
@@ -13,9 +14,10 @@ interface OverlapState {
   loading: boolean;
   error: string | null;
   items: DomainIntersectionItem[];
+  totalCount: number | null;
 }
 
-function OverlapPanel({ overlap }: { overlap?: OverlapState }) {
+function OverlapPanel({ overlap, fashionOnly }: { overlap?: OverlapState; fashionOnly: boolean }) {
   if (!overlap) return null;
   if (overlap.loading) return <p className="px-4 py-3 text-xs text-neutral-500">Loading overlapping keywords…</p>;
   if (overlap.error) return <p className="px-4 py-3 text-xs text-rose-400">{overlap.error}</p>;
@@ -23,6 +25,12 @@ function OverlapPanel({ overlap }: { overlap?: OverlapState }) {
 
   return (
     <div className="border-t border-neutral-800 px-4 py-3">
+      {overlap.totalCount !== null && (
+        <p className="mb-2 text-[11px] text-neutral-600">
+          {overlap.totalCount.toLocaleString()} shared keywords total{fashionOnly ? ' (fashion vocabulary only)' : ''} — showing
+          top {overlap.items.length} by volume
+        </p>
+      )}
       <table className="w-full text-left text-xs">
         <thead>
           <tr className="text-neutral-500">
@@ -59,6 +67,7 @@ export default function CompetitiveSetPage() {
   const [meta, setMeta] = useState<{ elapsedMs?: number; httpStatus?: number } | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [overlaps, setOverlaps] = useState<Record<string, OverlapState>>({});
+  const [fashionOnly, setFashionOnly] = useState(false);
 
   const [sortBy, setSortBy] = useState<SortBy>('intersections');
   const [minIntersections, setMinIntersections] = useState(0);
@@ -115,32 +124,39 @@ export default function CompetitiveSetPage() {
     }
     setExpanded(candidateDomain);
 
-    if (overlaps[candidateDomain]) return; // already fetched
+    if (overlaps[candidateDomain]) return; // already fetched under the current fashion-only setting
 
-    setOverlaps((prev) => ({ ...prev, [candidateDomain]: { loading: true, error: null, items: [] } }));
+    setOverlaps((prev) => ({ ...prev, [candidateDomain]: { loading: true, error: null, items: [], totalCount: null } }));
+
+    const body: Record<string, unknown> = {
+      target1: searchedDomain,
+      target2: candidateDomain,
+      location_code: location.location_code,
+      language_code: location.language_code,
+      limit: 20,
+      order_by: ['keyword_data.keyword_info.search_volume,desc'],
+    };
+    if (fashionOnly) {
+      body.filters = ['keyword_data.keyword', 'regex', FASHION_KEYWORD_REGEX];
+    }
 
     const result = await runDataForSEO<DomainIntersectionItem>({
       path: 'dataforseo_labs/google/domain_intersection/live',
       mode,
-      body: [
-        {
-          target1: searchedDomain,
-          target2: candidateDomain,
-          location_code: location.location_code,
-          language_code: location.language_code,
-          limit: 20,
-        },
-      ],
+      body: [body],
     });
 
     const taskError = extractError(result);
-    const items = taskError
-      ? []
-      : extractItems(result).sort(
-          (a, b) => (b.keyword_data?.keyword_info?.search_volume ?? 0) - (a.keyword_data?.keyword_info?.search_volume ?? 0)
-        );
+    const items = taskError ? [] : extractItems(result);
+    const totalCount = taskError ? null : extractTotalCount(result);
 
-    setOverlaps((prev) => ({ ...prev, [candidateDomain]: { loading: false, error: taskError, items } }));
+    setOverlaps((prev) => ({ ...prev, [candidateDomain]: { loading: false, error: taskError, items, totalCount } }));
+  }
+
+  function toggleFashionOnly() {
+    setFashionOnly((prev) => !prev);
+    setOverlaps({}); // cached results reflect the old filter setting — clear so the next expand refetches
+    setExpanded(null);
   }
 
   function toggleConfirmed(item: CompetitorDomainItem, e: MouseEvent) {
@@ -223,6 +239,17 @@ export default function CompetitiveSetPage() {
           <span className="text-xs text-neutral-500">{competitiveSet.set.length} brand(s)</span>
         </div>
 
+        <label className="mt-2 flex items-center gap-2 text-xs text-neutral-500">
+          <input
+            type="checkbox"
+            checked={fashionOnly}
+            onChange={toggleFashionOnly}
+            className="h-3.5 w-3.5 rounded border-neutral-700 bg-neutral-900"
+          />
+          Fashion keywords only for &ldquo;Show overlap&rdquo; — filters out brand-name noise (nike, mango, birkenstock…) so
+          only genuine garment-category overlap shows
+        </label>
+
         {competitiveSet.set.length === 0 ? (
           <p className="mt-2 text-xs text-neutral-500">
             Nothing confirmed yet. Add suggestions from the list below, or add brands directly.
@@ -255,7 +282,7 @@ export default function CompetitiveSetPage() {
                     </button>
                   </div>
                 </div>
-                {expanded === c.domain && <OverlapPanel overlap={overlaps[c.domain]} />}
+                {expanded === c.domain && <OverlapPanel overlap={overlaps[c.domain]} fashionOnly={fashionOnly} />}
               </li>
             ))}
           </ul>
@@ -376,7 +403,7 @@ export default function CompetitiveSetPage() {
                 </div>
               </div>
 
-              {isOpen && <OverlapPanel overlap={overlap} />}
+              {isOpen && <OverlapPanel overlap={overlap} fashionOnly={fashionOnly} />}
             </li>
           );
         })}
