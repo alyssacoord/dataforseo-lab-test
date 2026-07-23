@@ -9,6 +9,7 @@ import { FASHION_KEYWORD_REGEX } from '@/lib/keywordVocabulary';
 import type { CompetitorDomainItem, DomainIntersectionItem } from '@/lib/types';
 
 type SortBy = 'intersections' | 'etv';
+type FilterMode = 'none' | 'regex' | 'langchain';
 
 interface OverlapState {
   loading: boolean;
@@ -17,7 +18,7 @@ interface OverlapState {
   totalCount: number | null;
 }
 
-function OverlapPanel({ overlap, fashionOnly }: { overlap?: OverlapState; fashionOnly: boolean }) {
+function OverlapPanel({ overlap, filterMode }: { overlap?: OverlapState; filterMode: FilterMode }) {
   if (!overlap) return null;
   if (overlap.loading) return <p className="px-4 py-3 text-xs text-neutral-500">Loading overlapping keywords…</p>;
   if (overlap.error) return <p className="px-4 py-3 text-xs text-rose-400">{overlap.error}</p>;
@@ -27,8 +28,8 @@ function OverlapPanel({ overlap, fashionOnly }: { overlap?: OverlapState; fashio
     <div className="border-t border-neutral-800 px-4 py-3">
       {overlap.totalCount !== null && (
         <p className="mb-2 text-[11px] text-neutral-600">
-          {overlap.totalCount.toLocaleString()} shared keywords total{fashionOnly ? ' (fashion vocabulary only)' : ''} — showing
-          top {overlap.items.length} by volume
+          {overlap.totalCount.toLocaleString()} shared keywords total{filterMode === 'regex' ? ' (fashion vocabulary only)' : ''}{' '}
+          — showing top {overlap.items.length} by volume
         </p>
       )}
       <table className="w-full text-left text-xs">
@@ -67,7 +68,7 @@ export default function CompetitiveSetPage() {
   const [meta, setMeta] = useState<{ elapsedMs?: number; httpStatus?: number } | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [overlaps, setOverlaps] = useState<Record<string, OverlapState>>({});
-  const [fashionOnly, setFashionOnly] = useState(false);
+  const [filterMode, setFilterMode] = useState<FilterMode>('none');
 
   const [sortBy, setSortBy] = useState<SortBy>('intersections');
   const [minIntersections, setMinIntersections] = useState(0);
@@ -136,7 +137,7 @@ export default function CompetitiveSetPage() {
       limit: 20,
       order_by: ['keyword_data.keyword_info.search_volume,desc'],
     };
-    if (fashionOnly) {
+    if (filterMode === 'regex') {
       body.filters = ['keyword_data.keyword', 'regex', FASHION_KEYWORD_REGEX];
     }
 
@@ -153,8 +154,9 @@ export default function CompetitiveSetPage() {
     setOverlaps((prev) => ({ ...prev, [candidateDomain]: { loading: false, error: taskError, items, totalCount } }));
   }
 
-  function toggleFashionOnly() {
-    setFashionOnly((prev) => !prev);
+  function selectFilterMode(next: FilterMode) {
+    if (next === filterMode) return;
+    setFilterMode(next);
     setOverlaps({}); // cached results reflect the old filter setting — clear so the next expand refetches
     setExpanded(null);
   }
@@ -171,6 +173,8 @@ export default function CompetitiveSetPage() {
       source: 'suggested',
       intersections: item.intersections,
       etv: item.full_domain_metrics?.organic?.etv,
+      count: item.full_domain_metrics?.organic?.count,
+      estimatedPaidTrafficCost: item.full_domain_metrics?.organic?.estimated_paid_traffic_cost,
     });
   }
 
@@ -239,16 +243,39 @@ export default function CompetitiveSetPage() {
           <span className="text-xs text-neutral-500">{competitiveSet.set.length} brand(s)</span>
         </div>
 
-        <label className="mt-2 flex items-center gap-2 text-xs text-neutral-500">
-          <input
-            type="checkbox"
-            checked={fashionOnly}
-            onChange={toggleFashionOnly}
-            className="h-3.5 w-3.5 rounded border-neutral-700 bg-neutral-900"
-          />
-          Fashion keywords only for &ldquo;Show overlap&rdquo; — filters out brand-name noise (nike, mango, birkenstock…) so
-          only genuine garment-category overlap shows
-        </label>
+        <div className="mt-2 flex items-center gap-2 text-xs">
+          <span className="text-neutral-500">Keyword filter for &ldquo;Show overlap&rdquo;</span>
+          <div className="flex overflow-hidden rounded-md border border-neutral-700">
+            <button
+              type="button"
+              onClick={() => selectFilterMode('none')}
+              className={`px-2.5 py-1 ${filterMode === 'none' ? 'bg-neutral-100 text-neutral-900' : 'text-neutral-400 hover:bg-neutral-800'}`}
+            >
+              None
+            </button>
+            <button
+              type="button"
+              onClick={() => selectFilterMode('regex')}
+              className={`px-2.5 py-1 ${filterMode === 'regex' ? 'bg-neutral-100 text-neutral-900' : 'text-neutral-400 hover:bg-neutral-800'}`}
+            >
+              Fashion vocabulary
+            </button>
+            <button
+              type="button"
+              disabled
+              title="Planned: semantic keyword filtering via a LangChain agent, replacing this vocabulary-regex stopgap"
+              className="cursor-not-allowed px-2.5 py-1 text-neutral-700"
+            >
+              LangChain (coming soon)
+            </button>
+          </div>
+        </div>
+        {filterMode === 'regex' && (
+          <p className="mt-1 text-[11px] text-neutral-600">
+            Filters out brand-name noise (nike, mango, birkenstock…) using a garment-vocabulary regex — a stopgap until the
+            LangChain option above is built.
+          </p>
+        )}
 
         {competitiveSet.set.length === 0 ? (
           <p className="mt-2 text-xs text-neutral-500">
@@ -262,7 +289,18 @@ export default function CompetitiveSetPage() {
                   <span>
                     {c.domain}{' '}
                     <span className="text-neutral-600">
-                      {c.source === 'manual' ? '· added manually' : `· ${c.intersections ?? '—'} shared keywords`}
+                      {c.source === 'manual' ? (
+                        '· added manually'
+                      ) : (
+                        <>
+                          · {c.intersections ?? '—'} shared keywords
+                          {c.count !== undefined && <> · {c.count.toLocaleString()} total ranking keywords</>}
+                          {c.etv !== undefined && <> · est. traffic value {Math.round(c.etv).toLocaleString()}</>}
+                          {c.estimatedPaidTrafficCost !== undefined && (
+                            <> · ${Math.round(c.estimatedPaidTrafficCost).toLocaleString()} USD ad-equivalent</>
+                          )}
+                        </>
+                      )}
                     </span>
                   </span>
                   <div className="flex items-center gap-3">
@@ -282,7 +320,7 @@ export default function CompetitiveSetPage() {
                     </button>
                   </div>
                 </div>
-                {expanded === c.domain && <OverlapPanel overlap={overlaps[c.domain]} fashionOnly={fashionOnly} />}
+                {expanded === c.domain && <OverlapPanel overlap={overlaps[c.domain]} filterMode={filterMode} />}
               </li>
             ))}
           </ul>
@@ -376,7 +414,11 @@ export default function CompetitiveSetPage() {
                   <p className="text-sm font-medium text-neutral-100">{item.domain}</p>
                   <p className="mt-0.5 text-xs text-neutral-500">
                     {item.intersections} shared keywords · avg position {item.avg_position?.toFixed(1)}
+                    {organic?.count !== undefined && <> · {organic.count.toLocaleString()} total ranking keywords</>}
                     {organic?.etv !== undefined && <> · est. traffic value {Math.round(organic.etv).toLocaleString()}</>}
+                    {organic?.estimated_paid_traffic_cost !== undefined && (
+                      <> · est. ad-equivalent value ${Math.round(organic.estimated_paid_traffic_cost).toLocaleString()} USD</>
+                    )}
                     {organic?.pos_1 !== undefined && <> · {organic.pos_1.toLocaleString()} #1 rankings</>}
                   </p>
                 </button>
@@ -403,7 +445,7 @@ export default function CompetitiveSetPage() {
                 </div>
               </div>
 
-              {isOpen && <OverlapPanel overlap={overlap} fashionOnly={fashionOnly} />}
+              {isOpen && <OverlapPanel overlap={overlap} filterMode={filterMode} />}
             </li>
           );
         })}

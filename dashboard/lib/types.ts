@@ -8,6 +8,7 @@ export interface CompetitorDomainItem {
       etv?: number;
       count?: number;
       pos_1?: number;
+      estimated_paid_traffic_cost?: number;
     };
   };
 }
@@ -36,6 +37,8 @@ export interface ConfirmedCompetitor {
   source: 'suggested' | 'manual';
   intersections?: number;
   etv?: number;
+  count?: number;
+  estimatedPaidTrafficCost?: number;
 }
 
 export interface TrendGraphPoint {
