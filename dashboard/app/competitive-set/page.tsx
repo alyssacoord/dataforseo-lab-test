@@ -6,6 +6,8 @@ import { runDataForSEO, extractItems, extractError, extractTotalCount } from '@/
 import { useCompetitiveSet } from '@/lib/useCompetitiveSet';
 import { LOCATIONS } from '@/lib/locations';
 import { FASHION_KEYWORD_REGEX } from '@/lib/keywordVocabulary';
+import { CATEGORICAL } from '@/lib/palette';
+import { BarChart } from '@/components/BarChart';
 import type { CompetitorDomainItem, DomainIntersectionItem } from '@/lib/types';
 
 type SortBy = 'intersections' | 'etv';
@@ -59,7 +61,7 @@ function OverlapPanel({ overlap, filterMode }: { overlap?: OverlapState; filterM
 export default function CompetitiveSetPage() {
   const { mode } = useMode();
 
-  const [domain, setDomain] = useState('next.co.uk, jdwilliams.co.uk, simplybe.co.uk, studio.co.uk, freemans.com, laredoute.co.uk, argos.co.uk, very.co.uk');
+  const [domain, setDomain] = useState('very.co.uk');
   const [searchedDomain, setSearchedDomain] = useState('very.co.uk');
   const [location, setLocation] = useState<(typeof LOCATIONS)[number]>(LOCATIONS[0]);
   const [loading, setLoading] = useState(false);
@@ -74,6 +76,10 @@ export default function CompetitiveSetPage() {
   const [minIntersections, setMinIntersections] = useState(0);
 
   const [manualDomain, setManualDomain] = useState('');
+
+  const [comparisonLoading, setComparisonLoading] = useState(false);
+  const [comparisonError, setComparisonError] = useState<string | null>(null);
+  const [comparisonResults, setComparisonResults] = useState<Record<string, number | null>>({});
 
   const competitiveSet = useCompetitiveSet(searchedDomain);
 
@@ -159,6 +165,50 @@ export default function CompetitiveSetPage() {
     setFilterMode(next);
     setOverlaps({}); // cached results reflect the old filter setting — clear so the next expand refetches
     setExpanded(null);
+  }
+
+  async function handleCompareAll() {
+    const peers = competitiveSet.set.map((c) => c.domain);
+    if (peers.length === 0) return;
+
+    setComparisonLoading(true);
+    setComparisonError(null);
+    setComparisonResults({});
+
+    const bodyBase: Record<string, unknown> = {
+      location_code: location.location_code,
+      language_code: location.language_code,
+      limit: 1, // only need total_count for the chart, not the sample keywords
+    };
+    if (filterMode === 'regex') {
+      bodyBase.filters = ['keyword_data.keyword', 'regex', FASHION_KEYWORD_REGEX];
+    }
+
+    const results = await Promise.all(
+      peers.map((peer) =>
+        runDataForSEO<DomainIntersectionItem>({
+          path: 'dataforseo_labs/google/domain_intersection/live',
+          mode,
+          body: [{ ...bodyBase, target1: searchedDomain, target2: peer }],
+        }).then((result) => ({ peer, result }))
+      )
+    );
+
+    setComparisonLoading(false);
+
+    const next: Record<string, number | null> = {};
+    let anyFailed = false;
+    for (const { peer, result } of results) {
+      const err = extractError(result);
+      if (err) {
+        anyFailed = true;
+        next[peer] = null;
+        continue;
+      }
+      next[peer] = extractTotalCount(result);
+    }
+    setComparisonResults(next);
+    if (anyFailed) setComparisonError('Some peers could not be compared — see the chart for which ones came back.');
   }
 
   function toggleConfirmed(item: CompetitorDomainItem, e: MouseEvent) {
@@ -324,6 +374,55 @@ export default function CompetitiveSetPage() {
               </li>
             ))}
           </ul>
+        )}
+
+        {competitiveSet.set.length >= 2 && (
+          <div className="mt-3 rounded-md border border-neutral-800 bg-neutral-950/40 p-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium text-neutral-200">Peer overlap comparison</p>
+                <p className="text-[11px] text-neutral-600">
+                  Shared-keyword tightness vs. {searchedDomain}, across your whole confirmed set — one chart for the slide
+                  deck instead of clicking each peer individually.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleCompareAll}
+                disabled={comparisonLoading}
+                className="shrink-0 rounded-md border border-neutral-700 px-3 py-1.5 text-xs font-medium text-neutral-200 hover:bg-neutral-800 disabled:opacity-50"
+              >
+                {comparisonLoading ? 'Comparing…' : 'Compare all'}
+              </button>
+            </div>
+
+            {comparisonError && <p className="mt-2 text-xs text-rose-400">{comparisonError}</p>}
+
+            {Object.keys(comparisonResults).length > 0 &&
+              (() => {
+                const entries = Object.entries(comparisonResults)
+                  .filter((entry): entry is [string, number] => entry[1] !== null)
+                  .sort((a, b) => b[1] - a[1]);
+                if (entries.length === 0) {
+                  return <p className="mt-2 text-xs text-neutral-500">No comparisons came back — try again.</p>;
+                }
+                return (
+                  <div className="mt-4">
+                    <BarChart
+                      data={entries.map(([peer, count], i) => ({
+                        label: peer,
+                        value: count,
+                        color: CATEGORICAL[i % CATEGORICAL.length],
+                      }))}
+                      maxValue={Math.max(...entries.map(([, count]) => count), 1)}
+                    />
+                    {filterMode === 'regex' && (
+                      <p className="mt-2 text-[11px] text-neutral-600">Fashion vocabulary filter applied.</p>
+                    )}
+                  </div>
+                );
+              })()}
+          </div>
         )}
 
         <form onSubmit={handleManualAdd} className="mt-3 flex gap-2">
