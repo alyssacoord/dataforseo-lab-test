@@ -14,7 +14,7 @@ interface BarChartProps {
 
 export function BarChart({ data, height = 140, maxValue = 100 }: BarChartProps) {
   return (
-    <div className="flex items-end gap-4" style={{ height }}>
+    <div className="flex gap-4" style={{ height }}>
       {data.map((d) => {
         const pct = Math.max(0, Math.min(100, (d.value / maxValue) * 100));
         return (

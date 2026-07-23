@@ -225,6 +225,7 @@ export default function CompetitiveSetPage() {
       etv: item.full_domain_metrics?.organic?.etv,
       count: item.full_domain_metrics?.organic?.count,
       estimatedPaidTrafficCost: item.full_domain_metrics?.organic?.estimated_paid_traffic_cost,
+      avgPosition: item.avg_position,
     });
   }
 
@@ -379,13 +380,10 @@ export default function CompetitiveSetPage() {
         {competitiveSet.set.length >= 2 && (
           <div className="mt-3 rounded-md border border-neutral-800 bg-neutral-950/40 p-3">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium text-neutral-200">Peer overlap comparison</p>
-                <p className="text-[11px] text-neutral-600">
-                  Shared-keyword tightness vs. {searchedDomain}, across your whole confirmed set — one chart for the slide
-                  deck instead of clicking each peer individually.
-                </p>
-              </div>
+              <p className="text-xs font-medium text-neutral-200">
+                Peer overlap comparison — shared keywords vs. {searchedDomain}
+                {filterMode === 'regex' ? ' (fashion vocabulary only)' : ''}
+              </p>
               <button
                 type="button"
                 onClick={handleCompareAll}
@@ -406,6 +404,9 @@ export default function CompetitiveSetPage() {
                 if (entries.length === 0) {
                   return <p className="mt-2 text-xs text-neutral-500">No comparisons came back — try again.</p>;
                 }
+                const topCount = entries[0][1];
+                const snapshotByDomain = new Map(competitiveSet.set.map((c) => [c.domain, c]));
+
                 return (
                   <div className="mt-4">
                     <BarChart
@@ -414,11 +415,50 @@ export default function CompetitiveSetPage() {
                         value: count,
                         color: CATEGORICAL[i % CATEGORICAL.length],
                       }))}
-                      maxValue={Math.max(...entries.map(([, count]) => count), 1)}
+                      maxValue={Math.max(topCount, 1)}
                     />
-                    {filterMode === 'regex' && (
-                      <p className="mt-2 text-[11px] text-neutral-600">Fashion vocabulary filter applied.</p>
-                    )}
+
+                    <table className="mt-5 w-full text-left text-xs">
+                      <thead>
+                        <tr className="text-neutral-500">
+                          <th className="pb-2 font-normal">Peer</th>
+                          <th className="pb-2 font-normal">Shared keywords</th>
+                          <th className="pb-2 font-normal">% of tightest peer</th>
+                          <th className="pb-2 font-normal">Total ranking keywords</th>
+                          <th className="pb-2 font-normal">Avg position</th>
+                          <th className="pb-2 font-normal">Est. traffic value</th>
+                          <th className="pb-2 font-normal">Est. ad-equivalent (USD)</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {entries.map(([peer, count]) => {
+                          const snapshot = snapshotByDomain.get(peer);
+                          return (
+                            <tr key={peer} className="border-t border-neutral-800/60 text-neutral-300">
+                              <td className="py-1.5 pr-2">{peer}</td>
+                              <td className="py-1.5 pr-2 tabular-nums">{count.toLocaleString()}</td>
+                              <td className="py-1.5 pr-2 tabular-nums">{Math.round((count / topCount) * 100)}%</td>
+                              <td className="py-1.5 pr-2 tabular-nums">{snapshot?.count?.toLocaleString() ?? '—'}</td>
+                              <td className="py-1.5 pr-2 tabular-nums">{snapshot?.avgPosition?.toFixed(1) ?? '—'}</td>
+                              <td className="py-1.5 pr-2 tabular-nums">
+                                {snapshot?.etv !== undefined ? Math.round(snapshot.etv).toLocaleString() : '—'}
+                              </td>
+                              <td className="py-1.5 tabular-nums">
+                                {snapshot?.estimatedPaidTrafficCost !== undefined
+                                  ? `$${Math.round(snapshot.estimatedPaidTrafficCost).toLocaleString()}`
+                                  : '—'}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                    <p className="mt-2 text-[11px] text-neutral-600">
+                      &ldquo;Total ranking keywords,&rdquo; avg position, traffic value, and ad-equivalent value are snapshotted
+                      from when each peer was added to the set — re-add a peer to refresh them. &ldquo;Shared keywords&rdquo; and
+                      &ldquo;% of tightest peer&rdquo; are from this comparison run. Manually-added peers show &ldquo;—&rdquo;
+                      for snapshot columns since they weren&rsquo;t pulled from a suggestion.
+                    </p>
                   </div>
                 );
               })()}

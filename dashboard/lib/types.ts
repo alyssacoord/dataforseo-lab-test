@@ -39,6 +39,7 @@ export interface ConfirmedCompetitor {
   etv?: number;
   count?: number;
   estimatedPaidTrafficCost?: number;
+  avgPosition?: number;
 }
 
 export interface TrendGraphPoint {
