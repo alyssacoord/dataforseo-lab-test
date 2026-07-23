@@ -1,6 +1,6 @@
 # Plan — Very.co.uk Competitive Intelligence
 
-**Last updated:** 2026-07-23 (after: LangChain relevance-filtering plan written — see [`langchain-plan.md`](langchain-plan.md) and "What's been delivered today")
+**Last updated:** 2026-07-23 (after: ad-equivalent value converted to GBP — see "What's been delivered today")
 **Source brief:** colleague message re: Very's tiered peer set (for DataForSEO traffic/rank pulls) + keyword seeds mined from ~156k sampled SKU scrapes.
 **Built in:** `dashboard/` — Competitive Set, Search Visibility, and Trend Detection modules.
 **Convention:** this file gets updated every time something in the app or the underlying analysis changes — treat it as the current source of truth for status, not a point-in-time snapshot.
@@ -83,7 +83,7 @@ The brief offers to generate the full head×modifier cartesian, ranked by the te
 
 - Full Tier 1 analysis (visibility trend, algorithmic cross-check, pairwise overlap, ranked keywords) — real Live data, ~$1.25 total cost.
 - The Argos reordering finding, which materially changes how Tier 1 should be presented.
-- Nine permanent app improvements to Competitive Set, all verified end-to-end against the running app (clean typecheck/build, real Live calls through the app's own proxy, not just scripted once and discarded):
+- Ten permanent app improvements to Competitive Set, all verified end-to-end against the running app (clean typecheck/build, real Live calls through the app's own proxy, not just scripted once and discarded):
   1. Bulk-add peer domains (paste a list instead of one-at-a-time).
   2. "Show overlap" wired onto confirmed-set entries, not just auto-suggested candidates.
   3. Server-side fashion-vocabulary keyword filter for overlap results.
@@ -93,6 +93,7 @@ The brief offers to generate the full head×modifier cartesian, ranked by the te
   7. **Fixed a real `BarChart` rendering bug**, caught from a screenshot: the outer flex container used `align-items: flex-end` instead of the default `stretch`, so columns never received a definite height — every bar's `height: {pct}%` had nothing valid to resolve against and silently collapsed to a 2px fallback regardless of the real value. All bars looked identical (a flat colored underline) no matter how different the underlying numbers were. Fixed for all three existing chart usages (AI Visibility's two charts too), not just this one.
   8. Added a detail table below the peer comparison chart — shared keywords, % of the tightest peer, total ranking keywords, avg position, traffic value, ad-equivalent value.
   9. **Made that table self-sufficient**, after another screenshot showed it blank for manually-added peers: it originally read the extra columns off each peer's add-time snapshot, which either never existed (manual adds) or predated the fields (peers added before the snapshot was extended). "Compare all" now fetches everything live per peer instead — `domain_intersection` (limit 20, to average a real "avg position on shared keywords") plus `ranked_keywords` (limit 1, for the peer's own count/traffic-value/ad-equivalent — confirmed these aggregate fields don't depend on the item limit). Every column now populates for any peer, regardless of how it was added.
+  10. **Ad-equivalent value converted from USD to GBP.** `estimated_paid_traffic_cost` is always USD-denominated regardless of `location_code` (confirmed via docs) — a real gap in a UK-focused tool. Chose a live-fetched rate (Frankfurter, free, no key, 24h server-side cache via `app/api/fx-rate`) over a static `.env` number. GBP is the headline figure at all three display sites; the original USD amount, exact rate, and as-of date stay visible on hover, never silently discarded. Falls back to plain USD if the FX fetch fails — never breaks or shows a wrong number. Verified the cache is real, not just present in code: dev log showed the first call at 171ms (a genuine network round-trip), every call after at 2-3ms.
 
 ## Next steps, in order
 
