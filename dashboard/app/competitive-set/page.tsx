@@ -20,6 +20,14 @@ interface OverlapState {
   totalCount: number | null;
 }
 
+interface ComparisonRow {
+  sharedKeywords: number;
+  avgPositionOnShared: number | null; // averaged from this run's own sample, not an add-time snapshot
+  count: number | null; // peer's own total ranking-keyword footprint
+  etv: number | null; // peer's own traffic value
+  adEquivalentCost: number | null; // peer's own ad-equivalent value
+}
+
 function OverlapPanel({ overlap, filterMode }: { overlap?: OverlapState; filterMode: FilterMode }) {
   if (!overlap) return null;
   if (overlap.loading) return <p className="px-4 py-3 text-xs text-neutral-500">Loading overlapping keywords…</p>;
@@ -79,7 +87,7 @@ export default function CompetitiveSetPage() {
 
   const [comparisonLoading, setComparisonLoading] = useState(false);
   const [comparisonError, setComparisonError] = useState<string | null>(null);
-  const [comparisonResults, setComparisonResults] = useState<Record<string, number | null>>({});
+  const [comparisonResults, setComparisonResults] = useState<Record<string, ComparisonRow | null>>({});
 
   const competitiveSet = useCompetitiveSet(searchedDomain);
 
@@ -175,37 +183,68 @@ export default function CompetitiveSetPage() {
     setComparisonError(null);
     setComparisonResults({});
 
-    const bodyBase: Record<string, unknown> = {
+    const intersectionBody: Record<string, unknown> = {
       location_code: location.location_code,
       language_code: location.language_code,
-      limit: 1, // only need total_count for the chart, not the sample keywords
+      limit: 20, // enough to average a real "avg position on shared keywords", not just get the total
+      order_by: ['keyword_data.keyword_info.search_volume,desc'],
     };
     if (filterMode === 'regex') {
-      bodyBase.filters = ['keyword_data.keyword', 'regex', FASHION_KEYWORD_REGEX];
+      intersectionBody.filters = ['keyword_data.keyword', 'regex', FASHION_KEYWORD_REGEX];
     }
 
     const results = await Promise.all(
-      peers.map((peer) =>
-        runDataForSEO<DomainIntersectionItem>({
-          path: 'dataforseo_labs/google/domain_intersection/live',
-          mode,
-          body: [{ ...bodyBase, target1: searchedDomain, target2: peer }],
-        }).then((result) => ({ peer, result }))
-      )
+      peers.map(async (peer) => {
+        const [intersectionResult, rankedResult] = await Promise.all([
+          runDataForSEO<DomainIntersectionItem>({
+            path: 'dataforseo_labs/google/domain_intersection/live',
+            mode,
+            body: [{ ...intersectionBody, target1: searchedDomain, target2: peer }],
+          }),
+          // Peer's own domain-level footprint — works for ANY peer, including manually-added
+          // ones with no add-time snapshot. limit:1 is enough — confirmed the aggregate
+          // metrics.organic fields are independent of the item limit.
+          runDataForSEO<unknown>({
+            path: 'dataforseo_labs/google/ranked_keywords/live',
+            mode,
+            body: [{ target: peer, location_code: location.location_code, language_code: location.language_code, limit: 1 }],
+          }),
+        ]);
+        return { peer, intersectionResult, rankedResult };
+      })
     );
 
     setComparisonLoading(false);
 
-    const next: Record<string, number | null> = {};
+    const next: Record<string, ComparisonRow | null> = {};
     let anyFailed = false;
-    for (const { peer, result } of results) {
-      const err = extractError(result);
-      if (err) {
+    for (const { peer, intersectionResult, rankedResult } of results) {
+      const intersectionErr = extractError(intersectionResult);
+      if (intersectionErr) {
         anyFailed = true;
         next[peer] = null;
         continue;
       }
-      next[peer] = extractTotalCount(result);
+
+      const sharedKeywords = extractTotalCount(intersectionResult) ?? 0;
+      const items = extractItems(intersectionResult);
+      const positions = items
+        .map((it) => it.second_domain_serp_element?.rank_absolute)
+        .filter((p): p is number => p !== undefined && p !== null);
+      const avgPositionOnShared = positions.length > 0 ? positions.reduce((a, b) => a + b, 0) / positions.length : null;
+
+      const rankedData = rankedResult.data?.tasks?.[0]?.result?.[0] as
+        | { metrics?: { organic?: { count?: number; etv?: number; estimated_paid_traffic_cost?: number } } }
+        | undefined;
+      const organic = rankedData?.metrics?.organic;
+
+      next[peer] = {
+        sharedKeywords,
+        avgPositionOnShared,
+        count: organic?.count ?? null,
+        etv: organic?.etv ?? null,
+        adEquivalentCost: organic?.estimated_paid_traffic_cost ?? null,
+      };
     }
     setComparisonResults(next);
     if (anyFailed) setComparisonError('Some peers could not be compared — see the chart for which ones came back.');
@@ -398,21 +437,21 @@ export default function CompetitiveSetPage() {
 
             {Object.keys(comparisonResults).length > 0 &&
               (() => {
-                const entries = Object.entries(comparisonResults)
-                  .filter((entry): entry is [string, number] => entry[1] !== null)
-                  .sort((a, b) => b[1] - a[1]);
+                const entries = Object.entries(comparisonResults).filter(
+                  (entry): entry is [string, ComparisonRow] => entry[1] !== null
+                );
+                entries.sort((a, b) => b[1].sharedKeywords - a[1].sharedKeywords);
                 if (entries.length === 0) {
                   return <p className="mt-2 text-xs text-neutral-500">No comparisons came back — try again.</p>;
                 }
-                const topCount = entries[0][1];
-                const snapshotByDomain = new Map(competitiveSet.set.map((c) => [c.domain, c]));
+                const topCount = entries[0][1].sharedKeywords;
 
                 return (
                   <div className="mt-4">
                     <BarChart
-                      data={entries.map(([peer, count], i) => ({
+                      data={entries.map(([peer, row], i) => ({
                         label: peer,
-                        value: count,
+                        value: row.sharedKeywords,
                         color: CATEGORICAL[i % CATEGORICAL.length],
                       }))}
                       maxValue={Math.max(topCount, 1)}
@@ -425,39 +464,35 @@ export default function CompetitiveSetPage() {
                           <th className="pb-2 font-normal">Shared keywords</th>
                           <th className="pb-2 font-normal">% of tightest peer</th>
                           <th className="pb-2 font-normal">Total ranking keywords</th>
-                          <th className="pb-2 font-normal">Avg position</th>
+                          <th className="pb-2 font-normal">Avg position (shared)</th>
                           <th className="pb-2 font-normal">Est. traffic value</th>
                           <th className="pb-2 font-normal">Est. ad-equivalent (USD)</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {entries.map(([peer, count]) => {
-                          const snapshot = snapshotByDomain.get(peer);
-                          return (
-                            <tr key={peer} className="border-t border-neutral-800/60 text-neutral-300">
-                              <td className="py-1.5 pr-2">{peer}</td>
-                              <td className="py-1.5 pr-2 tabular-nums">{count.toLocaleString()}</td>
-                              <td className="py-1.5 pr-2 tabular-nums">{Math.round((count / topCount) * 100)}%</td>
-                              <td className="py-1.5 pr-2 tabular-nums">{snapshot?.count?.toLocaleString() ?? '—'}</td>
-                              <td className="py-1.5 pr-2 tabular-nums">{snapshot?.avgPosition?.toFixed(1) ?? '—'}</td>
-                              <td className="py-1.5 pr-2 tabular-nums">
-                                {snapshot?.etv !== undefined ? Math.round(snapshot.etv).toLocaleString() : '—'}
-                              </td>
-                              <td className="py-1.5 tabular-nums">
-                                {snapshot?.estimatedPaidTrafficCost !== undefined
-                                  ? `$${Math.round(snapshot.estimatedPaidTrafficCost).toLocaleString()}`
-                                  : '—'}
-                              </td>
-                            </tr>
-                          );
-                        })}
+                        {entries.map(([peer, row]) => (
+                          <tr key={peer} className="border-t border-neutral-800/60 text-neutral-300">
+                            <td className="py-1.5 pr-2">{peer}</td>
+                            <td className="py-1.5 pr-2 tabular-nums">{row.sharedKeywords.toLocaleString()}</td>
+                            <td className="py-1.5 pr-2 tabular-nums">{Math.round((row.sharedKeywords / topCount) * 100)}%</td>
+                            <td className="py-1.5 pr-2 tabular-nums">{row.count?.toLocaleString() ?? '—'}</td>
+                            <td className="py-1.5 pr-2 tabular-nums">{row.avgPositionOnShared?.toFixed(1) ?? '—'}</td>
+                            <td className="py-1.5 pr-2 tabular-nums">
+                              {row.etv !== null ? Math.round(row.etv).toLocaleString() : '—'}
+                            </td>
+                            <td className="py-1.5 tabular-nums">
+                              {row.adEquivalentCost !== null ? `$${Math.round(row.adEquivalentCost).toLocaleString()}` : '—'}
+                            </td>
+                          </tr>
+                        ))}
                       </tbody>
                     </table>
                     <p className="mt-2 text-[11px] text-neutral-600">
-                      &ldquo;Total ranking keywords,&rdquo; avg position, traffic value, and ad-equivalent value are snapshotted
-                      from when each peer was added to the set — re-add a peer to refresh them. &ldquo;Shared keywords&rdquo; and
+                      Every column here is from this comparison run — including manually-added peers, which now get real
+                      values instead of a blank snapshot. &ldquo;Avg position (shared)&rdquo; is averaged across up to 20 shared
+                      keywords sampled in this run, not every keyword. &ldquo;Shared keywords&rdquo; and
                       &ldquo;% of tightest peer&rdquo; are from this comparison run. Manually-added peers show &ldquo;—&rdquo;
-                      for snapshot columns since they weren&rsquo;t pulled from a suggestion.
+                      &ldquo;% of tightest peer&rdquo; are relative to whichever peer shares the most keywords in this run.
                     </p>
                   </div>
                 );
